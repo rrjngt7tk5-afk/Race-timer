@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Regularity Race Timer</title>
+<style>
+:root {
+  --bg:       #080c08;
+  --panel:    #0d120d;
+  --border:   #1c2c1c;
+  --green:    #00e676;
+  --gdim:     #003d15;
+  --amber:    #ffab00;
+  --adim:     #3d2900;
+  --red:      #ff5252;
+  --rdim:     #3d0000;
+  --muted:    #2e4a2e;
+  --mtxt:     #4a7a4a;
+  --mono:     'Courier New', Courier, monospace;
+  --sans:     -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg);overflow:hidden}
+#app{height:100vh;display:flex;flex-direction:column;overflow:hidden;color:var(--green);font-family:var(--sans)}
+
+/* ── FLASH + CD OVERLAY ── */
+#flash{position:fixed;inset:0;background:rgba(0,230,118,.14);pointer-events:none;opacity:0;z-index:300;transition:opacity .05s}
+#flash.on{opacity:1}
+#cdbox{position:fixed;inset:0;background:rgba(6,10,6,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;pointer-events:none;opacity:0;transition:opacity .15s}
+#cdbox.on{opacity:1}
+#cdlabel{font-family:var(--mono);font-size:.9rem;letter-spacing:.25em;color:var(--muted);text-transform:uppercase;margin-bottom:10px}
+#cdnum{font-family:var(--mono);font-size:min(28vw,10rem);color:var(--green);line-height:1;transition:transform .08s}
+#cdnum.pop{transform:scale(1.2)}
+
+/* ── NAV TABS ── */
+.tabs{display:flex;gap:6px;flex-shrink:0}
+.tab{background:none;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:.6rem;letter-spacing:.1em;padding:5px 11px;border-radius:3px;cursor:pointer;text-transform:uppercase;transition:all .15s}
+.tab.on{background:var(--gdim);border-color:var(--green);color:var(--green)}
+.tab:active{opacity:.7}
+
+/* ── SCREEN ── */
+.screen{display:none;flex-direction:column;height:100vh;padding:14px;overflow:hidden}
+.screen.on{display:flex}
+
+/* ── NAV BAR ── */
+.navbar{display:flex;justify-content:space-between;align-items:center;padding-bottom:11px;border-bottom:1px solid var(--border);margin-bottom:14px;flex-shrink:0}
+.navbar-title{font-family:var(--mono);font-size:.68rem;letter-spacing:.2em;color:var(--muted);text-transform:uppercase}
+
+/* ── SETTINGS ── */
+.srow{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid var(--border);flex-shrink:0}
+.srow label{font-size:.78rem;color:var(--mtxt)}
+.dgroup{display:flex;align-items:center;gap:2px}
+.dsep{color:var(--muted);font-family:var(--mono);font-size:1.2rem;padding:0 2px;line-height:1}
+.dbox{display:flex;flex-direction:column;align-items:center}
+.darr{background:none;border:none;color:var(--muted);font-size:.6rem;padding:4px 8px;cursor:pointer;line-height:1;touch-action:manipulation}
+.darr:active{color:var(--green)}
+.dval{font-family:var(--mono);font-size:1.35rem;color:var(--amber);background:var(--panel);border:1px solid var(--border);border-radius:3px;width:2.2ch;text-align:center;padding:4px 0;line-height:1}
+
+/* ── TOGGLE ── */
+.tgl{position:relative;width:44px;height:24px;cursor:pointer;flex-shrink:0}
+.tgl input{opacity:0;width:0;height:0;position:absolute}
+.tslider{position:absolute;inset:0;border-radius:24px;background:var(--border);border:1px solid var(--border);transition:all .2s}
+.tslider:before{content:'';position:absolute;width:18px;height:18px;left:2px;top:2px;border-radius:50%;background:var(--muted);transition:all .2s}
+.tgl input:checked+.tslider{background:var(--gdim);border-color:var(--green)}
+.tgl input:checked+.tslider:before{transform:translateX(20px);background:var(--green)}
+
+/* ── LANDMARKS ── */
+.lm-list{flex:1;overflow-y:auto;margin-bottom:10px}
+.lm-item{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)}
+.lm-name{font-family:var(--mono);font-size:.85rem;color:var(--amber);width:76px;flex-shrink:0;letter-spacing:.04em}
+.lm-meta{flex:1;font-size:.7rem;color:var(--muted);line-height:1.6}
+.lm-disp{color:#4a8a4a;font-family:var(--mono)}
+.lm-del{background:none;border:1px solid var(--border);color:var(--muted);font-size:.7rem;padding:4px 8px;border-radius:3px;cursor:pointer;flex-shrink:0;touch-action:manipulation}
+.lm-del:active{color:var(--red);border-color:var(--red)}
+.lm-empty{text-align:center;color:var(--muted);padding:28px 0;font-size:.75rem;letter-spacing:.08em}
+.add-box{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:13px;flex-shrink:0}
+.add-title{font-size:.62rem;letter-spacing:.15em;color:var(--muted);text-transform:uppercase;margin-bottom:11px}
+.add-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+.add-row span{font-size:.75rem;color:var(--mtxt)}
+input.name-in{background:var(--bg);border:1px solid var(--gdim);border-radius:2px;color:var(--amber);font-family:var(--mono);font-size:1rem;padding:6px 10px;width:128px;outline:none;text-transform:uppercase;letter-spacing:.04em}
+input.name-in:focus{border-color:var(--green)}
+
+/* ── RACE ── */
+.lap-rows{display:flex;flex-direction:column;gap:9px;flex:1;justify-content:center}
+.lap-row{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:4px;border:1px solid transparent;transition:all .2s}
+.lap-row.active{border-color:var(--gdim);background:#0a160a}
+.lap-row.inactive{opacity:.2}
+.lap-row.done{opacity:.55}
+.lap-label{font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);width:42px;flex-shrink:0}
+.lap-row.active .lap-label{color:#4a8a4a}
+.lap-time{font-family:var(--mono);flex:1;letter-spacing:.03em}
+.lap-row.active .lap-time{font-size:clamp(2.2rem,9vw,3.4rem);color:var(--green)}
+.lap-row.inactive .lap-time,.lap-row.done .lap-time{font-size:clamp(1.1rem,4.5vw,1.7rem)}
+.t-neg{color:var(--green)}
+.t-pos{color:var(--red)}
+.t-zero{color:var(--green)}
+
+/* ── NAVIGATOR ── */
+.chips{display:flex;gap:7px;margin-bottom:9px;flex-shrink:0}
+.chip{flex:1;background:var(--panel);border:1px solid var(--border);border-radius:3px;padding:6px 7px;text-align:center}
+.chip.active{border-color:var(--gdim)}
+.chip.done{opacity:.45}
+.chip.dim{opacity:.3}
+.chip-lbl{font-size:.52rem;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:2px}
+.chip-t{font-family:var(--mono);font-size:.82rem;color:var(--green);display:block}
+.nav-lms{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:5px}
+.nav-lm{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:4px;border:1px solid transparent;transition:all .25s}
+.nav-lm.next{border-color:var(--adim);background:#1a1000}
+.nav-lm.next.fin{border-color:var(--rdim);background:#1a0000}
+.nav-lm.passed{opacity:.16}
+.nav-lm.upcoming{opacity:.32}
+.nav-nm{font-family:var(--mono);font-size:.9rem;color:var(--amber);width:76px;flex-shrink:0}
+.nav-lm.next .nav-nm{font-size:1rem;color:var(--amber)}
+.nav-lm.next.fin .nav-nm{color:var(--red)}
+.nav-lm.passed .nav-nm{color:var(--muted)}
+.nav-dv{font-family:var(--mono);font-size:.98rem;color:#4a8a4a;flex:1}
+.nav-lm.next .nav-dv{font-size:1.08rem;color:var(--green)}
+.nav-lm.next.fin .nav-dv{color:var(--red)}
+.nav-lm.passed .nav-dv{color:var(--muted);text-decoration:line-through}
+
+/* ── RESULT ── */
+.res-rows{display:flex;flex-direction:column;gap:11px;flex:1;justify-content:center}
+.res-row{display:flex;align-items:center;gap:11px;padding:12px;border:1px solid var(--border);border-radius:4px}
+.res-lbl{font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);width:42px;flex-shrink:0}
+.res-t{font-family:var(--mono);font-size:clamp(1.6rem,6vw,2.2rem);flex:1}
+.penalty-row{border-top:1px solid var(--border);padding-top:14px;margin-bottom:11px;display:flex;justify-content:space-between;align-items:baseline;flex-shrink:0}
+.penalty-lbl{font-size:.68rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--muted)}
+.penalty-val{font-family:var(--mono);font-size:clamp(1.8rem,7vw,2.6rem);color:var(--amber)}
+
+/* ── ACTION BUTTON ── */
+.action-area{padding-top:11px;flex-shrink:0}
+.abtn{width:100%;padding:17px;border-radius:4px;font-family:var(--mono);font-size:1rem;letter-spacing:.2em;text-transform:uppercase;cursor:pointer;border:2px solid;transition:filter .1s;touch-action:manipulation;user-select:none}
+.abtn:active{filter:brightness(1.5)}
+.abtn.start{background:var(--gdim);border-color:var(--green);color:var(--green)}
+.abtn.lap{background:var(--adim);border-color:var(--amber);color:var(--amber)}
+.abtn.finish{background:var(--rdim);border-color:var(--red);color:var(--red)}
+.abtn.reset{background:var(--panel);border-color:var(--muted);color:var(--muted)}
+.abtn.primary{background:var(--gdim);border-color:var(--green);color:var(--green);margin-top:auto}
+.hint{text-align:center;font-size:.58rem;letter-spacing:.1em;color:var(--muted);margin-top:5px;text-transform:uppercase}
+
+/* ── SHARE ROW ── */
+.share-row{display:flex;gap:8px;margin-top:10px;flex-shrink:0}
+.share-btn{flex:1;padding:9px;background:none;border:1px solid var(--border);border-radius:3px;color:var(--muted);font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;cursor:pointer;text-transform:uppercase;touch-action:manipulation}
+.share-btn:active{border-color:var(--green);color:var(--green)}
+.share-url{width:100%;margin-top:7px;padding:8px 10px;background:var(--panel);border:1px solid var(--border);border-radius:3px;color:var(--amber);font-family:var(--mono);font-size:.65rem;word-break:break-all;display:none}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="flash"></div>
+  <div id="cdbox">
+    <div id="cdlabel"></div>
+    <div id="cdnum"></div>
+  </div>
+
+  <!-- ── SETTINGS ── -->
+  <div id="s-settings" class="screen on">
+    <div class="navbar">
+      <span class="navbar-title">Settings</span>
+      <div class="tabs">
+        <button class="tab on" onclick="goto('settings')">Settings</button>
+        <button class="tab" onclick="goto('landmarks')">Landmarks</button>
+        <button class="tab" onclick="gotoRace()">Race</button>
+      </div>
+    </div>
+
+    <div class="srow">
+      <label>Ideal Lap Time</label>
+      <div class="dgroup">
+        <div class="dbox"><button class="darr" onclick="adj('ltM0',1)">▲</button><div class="dval" id="ltM0">0</div><button class="darr" onclick="adj('ltM0',-1)">▼</button></div>
+        <div class="dbox"><button class="darr" onclick="adj('ltM1',1)">▲</button><div class="dval" id="ltM1">4</div><button class="darr" onclick="adj('ltM1',-1)">▼</button></div>
+        <span class="dsep">:</span>
+        <div class="dbox"><button class="darr" onclick="adj('ltS0',1,5)">▲</button><div class="dval" id="ltS0">1</div><button class="darr" onclick="adj('ltS0',-1,5)">▼</button></div>
+        <div class="dbox"><button class="darr" onclick="adj('ltS1',1)">▲</button><div class="dval" id="ltS1">9</div><button class="darr" onclick="adj('ltS1',-1)">▼</button></div>
+        <span class="dsep">.</span>
+        <div class="dbox"><button class="darr" onclick="adj('ltH0',1,9)">▲</button><div class="dval" id="ltH0">0</div><button class="darr" onclick="adj('ltH0',-1,9)">▼</button></div>
+        <div class="dbox"><button class="darr" onclick="adj('ltH1',1)">▲</button><div class="dval" id="ltH1">0</div><button class="darr" onclick="adj('ltH1',-1)">▼</button></div>
+      </div>
+    </div>
+
+    <div class="srow">
+      <label>Number of Laps</label>
+      <div class="dbox"><button class="darr" onclick="adj('nLaps',1,9,1)">▲</button><div class="dval" id="nLaps">3</div><button class="darr" onclick="adj('nLaps',-1,9,1)">▼</button></div>
+    </div>
+
+    <div class="srow">
+      <label>Track Length (m)</label>
+      <div class="dgroup">
+        <div class="dbox"><button class="darr" onclick="adj('trk0',1)">▲</button><div class="dval" id="trk0">2</div><button class="darr" onclick="adj('trk0',-1)">▼</button></div>
+        <div class="dbox"><button class="darr" onclick="adj('trk1',1)">▲</button><div class="dval" id="trk1">0</div><button class="darr" onclick="adj('trk1',-1)">▼</button></div>
+        <div class="dbox"><button class="darr" onclick="adj('trk2',1)">▲</button><div class="dval" id="trk2">9</div><button class="darr" onclick="adj('trk2',-1)">▼</button></div>
+        <div class="dbox"><button class="darr" onclick="adj('trk3',1)">▲</button><div class="dval" id="trk3">4</div><button class="darr" onclick="adj('trk3',-1)">▼</button></div>
+      </div>
+    </div>
+
+    <div class="srow">
+      <label>Lap/Finish countdown (10 beeps)</label>
+      <label class="tgl"><input type="checkbox" id="lapCd" checked><span class="tslider"></span></label>
+    </div>
+
+    <div class="srow" style="border-bottom:none">
+      <label>Landmark countdown (10 beeps)</label>
+      <label class="tgl"><input type="checkbox" id="lmCd" checked><span class="tslider"></span></label>
+    </div>
+
+    <div class="share-row">
+      <button class="share-btn" onclick="saveUrl()">⎘ Copy settings URL</button>
+      <button class="share-btn" onclick="saveLocal()">💾 Save to device</button>
+    </div>
+    <div id="share-url-display" class="share-url"></div>
+
+    <button class="abtn primary" style="margin-top:16px" onclick="gotoRace()">▶ Go to Race</button>
+  </div>
+
+  <!-- ── LANDMARKS ── -->
+  <div id="s-landmarks" class="screen">
+    <div class="navbar">
+      <span class="navbar-title">Landmarks</span>
+      <div class="tabs">
+        <button class="tab" onclick="goto('settings')">Settings</button>
+        <button class="tab on" onclick="goto('landmarks')">Landmarks</button>
+        <button class="tab" onclick="gotoRace()">Race</button>
+      </div>
+    </div>
+    <div class="lm-list" id="lm-list"></div>
+    <div class="add-box">
+      <div class="add-title">Add Landmark</div>
+      <div class="add-row">
+        <span>Name (max 8)</span>
+        <input class="name-in" id="lm-name" maxlength="8" placeholder="BRIDGE" autocomplete="off" autocorrect="off" spellcheck="false">
+      </div>
+      <div class="add-row">
+        <span>Distance (m)</span>
+        <div class="dgroup">
+          <div class="dbox"><button class="darr" onclick="adj('lmD0',1)">▲</button><div class="dval" id="lmD0">0</div><button class="darr" onclick="adj('lmD0',-1)">▼</button></div>
+          <div class="dbox"><button class="darr" onclick="adj('lmD1',1)">▲</button><div class="dval" id="lmD1">0</div><button class="darr" onclick="adj('lmD1',-1)">▼</button></div>
+          <div class="dbox"><button class="darr" onclick="adj('lmD2',1)">▲</button><div class="dval" id="lmD2">0</div><button class="darr" onclick="adj('lmD2',-1)">▼</button></div>
+          <div class="dbox"><button class="darr" onclick="adj('lmD3',1)">▲</button><div class="dval" id="lmD3">0</div><button class="darr" onclick="adj('lmD3',-1)">▼</button></div>
+        </div>
+      </div>
+      <button class="abtn start" style="padding:10px;font-size:.8rem;margin-top:4px" onclick="addLandmark()">+ Add Landmark</button>
+    </div>
+  </div>
+
+  <!-- ── RACE ── -->
+  <div id="s-race" class="screen">
+    <div class="navbar" style="margin-bottom:8px">
+      <span class="navbar-title" id="race-title">Ready</span>
+      <div class="tabs">
+        <button class="tab on" id="tab-timer" onclick="setView('timer')">Timer</button>
+        <button class="tab" id="tab-nav" onclick="setView('nav')">Navigator</button>
+        <button class="tab" onclick="abortRace()">⚙</button>
+      </div>
+    </div>
+
+    <!-- Timer view -->
+    <div id="view-timer" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+      <div class="lap-rows" id="lap-rows"></div>
+      <div class="action-area">
+        <button class="abtn start" id="abtn" onclick="handleAction()">START</button>
+        <div class="hint" id="ahint"></div>
+      </div>
+    </div>
+
+    <!-- Navigator view -->
+    <div id="view-nav" style="display:none;flex-direction:column;flex:1;overflow:hidden">
+      <div class="chips" id="nav-chips"></div>
+      <div class="nav-lms" id="nav-lms"></div>
+      <div class="action-area">
+        <button class="abtn start" id="nabtn" onclick="handleAction()">START</button>
+        <div class="hint" id="nahint"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── RESULT ── -->
+  <div id="s-result" class="screen">
+    <div class="navbar">
+      <span class="navbar-title">Result</span>
+      <div class="tabs">
+        <button class="tab" onclick="goto('settings')">Settings</button>
+        <button class="tab" onclick="goto('landmarks')">Landmarks</button>
+      </div>
+    </div>
+    <div class="res-rows" id="res-rows"></div>
+    <div class="penalty-row">
+      <span class="penalty-lbl">Penalty</span>
+      <span class="penalty-val" id="penalty-val">0.00s</span>
+    </div>
+    <button class="abtn reset" onclick="gotoRace()">RESET</button>
+  </div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+const D = {
+  ltM0:0,ltM1:4,ltS0:1,ltS1:9,ltH0:0,ltH1:0,
+  nLaps:3,
+  trk0:2,trk1:0,trk2:9,trk3:4,
+  lmD0:0,lmD1:0,lmD2:0,lmD3:0,
+};
+let landmarks = [];
+let raceView  = 'timer';
+let phase     = 'pre';   // pre | running | finished
+let curLap    = 0;
+let lapResults= [];
+let startTime = null;
+let rafId     = null;
+let firedBeeps= new Set();
+let idealSecs = 0;
+let lmsCalc   = [];
+let nLapsRace = 3;
+
+// ── Audio ─────────────────────────────────────────────────────────────────────
+let audioCtx = null;
+function getACtx(){
+  if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  return audioCtx;
+}
+function beep(freq,dur,vol){
+  try{
+    const c=getACtx(),o=c.createOscillator(),g=c.createGain();
+    o.connect(g);g.connect(c.destination);
+    o.type='sine';o.frequency.value=freq;
+    g.gain.setValueAtTime(vol,c.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001,c.currentTime+dur);
+    o.start(c.currentTime);o.stop(c.currentTime+dur);
+  }catch(e){}
+  doFlash();
+}
+function doFlash(){
+  const f=document.getElementById('flash');
+  f.classList.add('on');
+  setTimeout(()=>f.classList.remove('on'),90);
+}
+
+// ── Countdown overlay ─────────────────────────────────────────────────────────
+let cdHide=null;
+function showCd(label,num){
+  const box=document.getElementById('cdbox');
+  const n=document.getElementById('cdnum');
+  document.getElementById('cdlabel').textContent=label;
+  n.textContent=num;
+  box.classList.add('on');
+  n.classList.remove('pop');
+  requestAnimationFrame(()=>{n.classList.add('pop');setTimeout(()=>n.classList.remove('pop'),120)});
+  if(cdHide)clearTimeout(cdHide);
+  cdHide=setTimeout(()=>box.classList.remove('on'),860);
+}
+function hideCd(){
+  if(cdHide)clearTimeout(cdHide);
+  document.getElementById('cdbox').classList.remove('on');
+}
+
+// ── Digit controls ────────────────────────────────────────────────────────────
+function adj(id,delta,max=9,min=0){
+  let v=parseInt(document.getElementById(id).textContent)+delta;
+  if(v>max)v=min; if(v<min)v=max;
+  document.getElementById(id).textContent=v;
+  D[id]=v;
+  saveLocal(true);
+}
+function setDval(id,v){document.getElementById(id).textContent=v;D[id]=v;}
+
+// ── Derived values ────────────────────────────────────────────────────────────
+function getIdeal(){return(D.ltM0*10+D.ltM1)*60+(D.ltS0*10+D.ltS1)+(D.ltH0*10+D.ltH1)/100;}
+function getTrack(){return D.trk0*1000+D.trk1*100+D.trk2*10+D.trk3;}
+function getLmMeters(){return D.lmD0*1000+D.lmD1*100+D.lmD2*10+D.lmD3;}
+
+// ── Formatting ────────────────────────────────────────────────────────────────
+function fmt(r){
+  const over=r<0,abs=Math.abs(r);
+  const m=Math.floor(abs/60),s=Math.floor(abs%60),h=Math.floor((abs%1)*100);
+  return(over?'+':'\u2212')+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')+'.'+String(h).padStart(2,'0');
+}
+function tcls(r){return Math.abs(r)<.01?'t-zero':r<0?'t-neg':'t-pos';}
+
+// ── Screen navigation ─────────────────────────────────────────────────────────
+function goto(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  document.getElementById('s-'+name).classList.add('on');
+  if(name==='landmarks')renderLandmarks();
+}
+
+function setView(v){
+  raceView=v;
+  document.getElementById('view-timer').style.display=v==='timer'?'flex':'none';
+  document.getElementById('view-nav').style.display=v==='nav'?'flex':'none';
+  document.getElementById('tab-timer').classList.toggle('on',v==='timer');
+  document.getElementById('tab-nav').classList.toggle('on',v==='nav');
+}
+
+function gotoRace(){
+  if(rafId){cancelAnimationFrame(rafId);rafId=null;}
+  phase='pre';curLap=0;lapResults=[];firedBeeps=new Set();
+  setView('timer');
+  buildLapRows();
+  buildNavScreen();
+  updateBtn();
+  document.getElementById('race-title').textContent='Ready';
+  goto('race');
+}
+
+function abortRace(){
+  if(rafId){cancelAnimationFrame(rafId);rafId=null;}
+  phase='pre';
+  goto('settings');
+}
+
+// ── Lap rows ──────────────────────────────────────────────────────────────────
+function buildLapRows(){
+  const ideal=getIdeal();
+  const c=document.getElementById('lap-rows');
+  c.innerHTML='';
+  for(let i=0;i<D.nLaps;i++){
+    const row=document.createElement('div');
+    row.className='lap-row inactive';
+    row.id='lr'+i;
+    row.innerHTML=`<div class="lap-label">LAP ${i+1}</div><div class="lap-time" id="lt${i}">${fmt(ideal)}</div>`;
+    c.appendChild(row);
+  }
+}
+
+function updateLapRows(rem){
+  const ideal=getIdeal();
+  for(let i=0;i<D.nLaps;i++){
+    const row=document.getElementById('lr'+i);
+    const te=document.getElementById('lt'+i);
+    if(i<curLap){
+      row.className='lap-row done';
+      te.textContent=fmt(lapResults[i]);
+      te.className='lap-time '+tcls(lapResults[i]);
+    } else if(i===curLap&&phase==='running'){
+      row.className='lap-row active';
+      te.textContent=fmt(rem);
+      te.className='lap-time';
+    } else {
+      row.className='lap-row inactive';
+      te.textContent=fmt(ideal);
+      te.className='lap-time';
+    }
+  }
+}
+
+// ── Navigator screen ──────────────────────────────────────────────────────────
+function buildNavScreen(){
+  const ideal=getIdeal(),track=getTrack();
+  // chips
+  const cc=document.getElementById('nav-chips');
+  cc.innerHTML='';
+  for(let i=0;i<D.nLaps;i++){
+    const ch=document.createElement('div');
+    ch.className='chip';ch.id='nch'+i;
+    ch.innerHTML=`<span class="chip-lbl">LAP ${i+1}</span><span class="chip-t" id="nct${i}">${fmt(ideal)}</span>`;
+    cc.appendChild(ch);
+  }
+  // landmark rows
+  const nl=document.getElementById('nav-lms');
+  nl.innerHTML='';
+  const items=getNavItems();
+  items.forEach((item,i)=>{
+    const row=document.createElement('div');
+    row.className='nav-lm upcoming'+(item.isFinish?' fin':'');
+    row.id='nlm'+i;
+    row.innerHTML=`<div class="nav-nm">${item.name}</div><div class="nav-dv">${fmt(item.dispRem)}</div>`;
+    nl.appendChild(row);
+  });
+}
+
+function getNavItems(){
+  const ideal=getIdeal(),track=getTrack();
+  const items=landmarks.map(lm=>({
+    name:lm.name,
+    trig:(lm.meters/track)*ideal,
+    dispRem:ideal-(lm.meters/track)*ideal,
+    isFinish:false
+  }));
+  items.push({name:'FINISH',trig:ideal,dispRem:0,isFinish:true});
+  items.sort((a,b)=>a.trig-b.trig);
+  return items;
+}
+
+function updateNavScreen(elapsed,rem){
+  const ideal=getIdeal();
+  // chips
+  for(let i=0;i<D.nLaps;i++){
+    const ch=document.getElementById('nch'+i);
+    const ct=document.getElementById('nct'+i);
+    if(!ch)continue;
+    if(i<curLap){
+      ch.className='chip done';
+      ct.textContent=fmt(lapResults[i]);
+      ct.className='chip-t '+tcls(lapResults[i]);
+    } else if(i===curLap&&phase==='running'){
+      ch.className='chip active';
+      ct.textContent=fmt(rem);
+      ct.className='chip-t';
+    } else {
+      ch.className='chip'+(phase==='running'?' dim':'');
+      ct.textContent=fmt(ideal);
+      ct.className='chip-t';
+    }
+  }
+  // landmark rows
+  const items=getNavItems();
+  const nextIdx=items.findIndex(x=>elapsed<x.trig);
+  items.forEach((item,i)=>{
+    const row=document.getElementById('nlm'+i);
+    if(!row)return;
+    const fin=item.isFinish?' fin':'';
+    const passed=phase==='running'&&elapsed>=item.trig;
+    const isNext=!passed&&i===nextIdx&&phase==='running';
+    if(passed) row.className='nav-lm passed'+fin;
+    else if(isNext) row.className='nav-lm next'+fin;
+    else row.className='nav-lm upcoming'+fin;
+  });
+}
+
+// ── Action button ─────────────────────────────────────────────────────────────
+function updateBtn(){
+  const isLast=curLap===D.nLaps-1;
+  const type=phase==='pre'?'start':isLast?'finish':'lap';
+  const lbl=phase==='pre'?'START':isLast?'FINISH':'LAP';
+  const hint=phase==='running'?`Lap ${curLap+1} of ${D.nLaps}`:'';
+  ['abtn','nabtn'].forEach(id=>{
+    const b=document.getElementById(id);
+    b.className='abtn '+type;
+    b.textContent=lbl;
+  });
+  document.getElementById('ahint').textContent=hint;
+  document.getElementById('nahint').textContent=hint;
+}
+
+// ── Beep scheduling ───────────────────────────────────────────────────────────
+function checkBeeps(elapsed){
+  const ideal=idealSecs;
+  const isLast=curLap===nLapsRace-1;
+  const lapLbl=isLast?'FINISH':'LAP '+(curLap+1);
+
+  // Lap countdown
+  if(document.getElementById('lapCd').checked){
+    for(let i=10;i>=1;i--){
+      const t=ideal-i; if(t<0)continue;
+      const k='lc'+i;
+      if(!firedBeeps.has(k)&&elapsed>=t){firedBeeps.add(k);beep(660,.07,.4);showCd(lapLbl,i);}
+    }
+  }
+  // Lap hit
+  if(!firedBeeps.has('lh')&&elapsed>=ideal){
+    firedBeeps.add('lh');beep(880,.08,.8);setTimeout(()=>beep(1047,.15,.8),100);hideCd();
+  }
+  // Landmarks
+  lmsCalc.forEach(lm=>{
+    if(document.getElementById('lmCd').checked){
+      for(let i=10;i>=1;i--){
+        const t=lm.trig-i; if(t<0)continue;
+        const k=lm.name+'c'+i;
+        if(!firedBeeps.has(k)&&elapsed>=t){firedBeeps.add(k);beep(660,.07,.4);showCd(lm.name,i);}
+      }
+    }
+    const k=lm.name+'h';
+    if(!firedBeeps.has(k)&&elapsed>=lm.trig){firedBeeps.add(k);beep(1047,.1,.7);hideCd();}
+  });
+}
+
+// ── Main loop ─────────────────────────────────────────────────────────────────
+function startLoop(){
+  function tick(){
+    if(phase!=='running')return;
+    const elapsed=(performance.now()-startTime)/1000;
+    const rem=idealSecs-elapsed;
+    updateLapRows(rem);
+    updateNavScreen(elapsed,rem);
+    checkBeeps(elapsed);
+    rafId=requestAnimationFrame(tick);
+  }
+  rafId=requestAnimationFrame(tick);
+}
+
+// ── Handle action ─────────────────────────────────────────────────────────────
+function handleAction(){
+  getACtx(); // unlock audio
+  const now=performance.now();
+
+  if(phase==='pre'){
+    idealSecs=getIdeal();
+    const track=getTrack();
+    nLapsRace=D.nLaps;
+    lmsCalc=landmarks.map(lm=>({...lm,trig:(lm.meters/track)*idealSecs}));
+    firedBeeps=new Set();
+    curLap=0;lapResults=[];
+    phase='running';startTime=now;
+    document.getElementById('race-title').textContent='Running';
+    updateBtn();
+    startLoop();
+
+  } else if(phase==='running'){
+    const elapsed=(now-startTime)/1000;
+    const rem=idealSecs-elapsed;
+    lapResults.push(rem);
+
+    if(curLap===nLapsRace-1){
+      // Finished
+      phase='finished';
+      cancelAnimationFrame(rafId);rafId=null;
+      updateLapRows(rem);
+      showResults();
+    } else {
+      curLap++;
+      startTime=now;
+      firedBeeps=new Set();
+      buildNavScreen();
+      updateBtn();
+    }
+  }
+}
+
+// ── Results ───────────────────────────────────────────────────────────────────
+function showResults(){
+  const c=document.getElementById('res-rows');
+  c.innerHTML='';
+  let penalty=0;
+  lapResults.forEach((r,i)=>{
+    penalty+=Math.abs(r);
+    const row=document.createElement('div');
+    row.className='res-row';
+    row.innerHTML=`<div class="res-lbl">LAP ${i+1}</div><div class="res-t ${tcls(r)}">${fmt(r)}</div>`;
+    c.appendChild(row);
+  });
+  document.getElementById('penalty-val').textContent=penalty.toFixed(2)+'s';
+  goto('result');
+}
+
+// ── Landmarks ─────────────────────────────────────────────────────────────────
+function addLandmark(){
+  const name=document.getElementById('lm-name').value.trim().toUpperCase().slice(0,8);
+  if(!name)return;
+  const m=getLmMeters();
+  if(!m)return;
+  const ideal=getIdeal(),track=getTrack();
+  landmarks.push({name,meters:m,trig:(m/track)*ideal});
+  landmarks.sort((a,b)=>a.meters-b.meters);
+  document.getElementById('lm-name').value='';
+  ['lmD0','lmD1','lmD2','lmD3'].forEach(id=>setDval(id,0));
+  saveLocal(true);
+  renderLandmarks();
+}
+
+function renderLandmarks(){
+  const ideal=getIdeal(),track=getTrack();
+  const c=document.getElementById('lm-list');
+  c.innerHTML='';
+  if(!landmarks.length){
+    c.innerHTML='<div class="lm-empty">No landmarks added yet</div>';
+    return;
+  }
+  landmarks.forEach((lm,i)=>{
+    const rem=ideal-(lm.meters/track)*ideal;
+    const row=document.createElement('div');
+    row.className='lm-item';
+    row.innerHTML=`
+      <div class="lm-name">${lm.name}</div>
+      <div class="lm-meta"><span>${lm.meters} m</span><span class="lm-disp">${fmt(rem)}</span></div>
+      <button class="lm-del" onclick="delLandmark(${i})">✕</button>`;
+    c.appendChild(row);
+  });
+}
+
+function delLandmark(i){
+  landmarks.splice(i,1);
+  saveLocal(true);
+  renderLandmarks();
+}
+
+// ── Persistence: localStorage ─────────────────────────────────────────────────
+function saveLocal(silent=false){
+  try{
+    const data={
+      ltM0:D.ltM0,ltM1:D.ltM1,ltS0:D.ltS0,ltS1:D.ltS1,ltH0:D.ltH0,ltH1:D.ltH1,
+      nLaps:D.nLaps,trk0:D.trk0,trk1:D.trk1,trk2:D.trk2,trk3:D.trk3,
+      lapCd:document.getElementById('lapCd').checked,
+      lmCd:document.getElementById('lmCd').checked,
+      landmarks
+    };
+    localStorage.setItem('rrt',JSON.stringify(data));
+    if(!silent){
+      const btn=event&&event.target;
+      if(btn){const orig=btn.textContent;btn.textContent='✓ Saved';setTimeout(()=>btn.textContent=orig,1500);}
+    }
+  }catch(e){}
+}
+
+function loadLocal(){
+  try{
+    const raw=localStorage.getItem('rrt');
+    if(!raw)return false;
+    const d=JSON.parse(raw);
+    const keys=['ltM0','ltM1','ltS0','ltS1','ltH0','ltH1','nLaps','trk0','trk1','trk2','trk3'];
+    keys.forEach(k=>{if(d[k]!==undefined)setDval(k,d[k]);});
+    if(d.lapCd!==undefined)document.getElementById('lapCd').checked=d.lapCd;
+    if(d.lmCd!==undefined)document.getElementById('lmCd').checked=d.lmCd;
+    if(d.landmarks)landmarks=d.landmarks;
+    return true;
+  }catch(e){return false;}
+}
+
+// ── Persistence: URL ──────────────────────────────────────────────────────────
+function saveUrl(){
+  const p=new URLSearchParams();
+  p.set('t',getIdeal().toFixed(2));
+  p.set('l',D.nLaps);
+  p.set('d',getTrack());
+  p.set('lc',document.getElementById('lapCd').checked?1:0);
+  p.set('mc',document.getElementById('lmCd').checked?1:0);
+  if(landmarks.length){
+    p.set('lms',encodeURIComponent(JSON.stringify(landmarks.map(lm=>({n:lm.name,m:lm.meters})))));
+  }
+  const url=location.origin+location.pathname+'?'+p.toString();
+  const disp=document.getElementById('share-url-display');
+  disp.textContent=url;
+  disp.style.display='block';
+  try{navigator.clipboard.writeText(url);}catch(e){}
+  try{history.replaceState(null,'',url);}catch(e){}
+}
+
+function loadUrl(){
+  const p=new URLSearchParams(location.search);
+  if(!p.has('t'))return false;
+
+  const t=parseFloat(p.get('t'));
+  if(isNaN(t))return false;
+
+  const mins=Math.floor(t/60);
+  const secs=Math.floor(t%60);
+  const huns=Math.round((t%1)*100);
+  setDval('ltM0',Math.floor(mins/10));
+  setDval('ltM1',mins%10);
+  setDval('ltS0',Math.floor(secs/10));
+  setDval('ltS1',secs%10);
+  setDval('ltH0',Math.floor(huns/10));
+  setDval('ltH1',huns%10);
+
+  if(p.has('l'))setDval('nLaps',parseInt(p.get('l'))||3);
+
+  if(p.has('d')){
+    const d=parseInt(p.get('d'))||2094;
+    setDval('trk0',Math.floor(d/1000));
+    setDval('trk1',Math.floor((d%1000)/100));
+    setDval('trk2',Math.floor((d%100)/10));
+    setDval('trk3',d%10);
+  }
+
+  if(p.has('lc'))document.getElementById('lapCd').checked=p.get('lc')==='1';
+  if(p.has('mc'))document.getElementById('lmCd').checked=p.get('mc')==='1';
+
+  if(p.has('lms')){
+    try{
+      const lms=JSON.parse(decodeURIComponent(p.get('lms')));
+      const ideal=getIdeal(),track=getTrack();
+      landmarks=lms.map(x=>({name:x.n,meters:x.m,trig:(x.m/track)*ideal}));
+    }catch(e){}
+  }
+  return true;
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+(function init(){
+  // URL params take priority, then localStorage
+  if(!loadUrl()) loadLocal();
+  renderLandmarks();
+})();
+</script>
+</body>
+</html>
