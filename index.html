@@ -2,76 +2,132 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Regularity Race Timer</title>
 <style>
-:root {
-  --bg:       #080c08;
-  --panel:    #0d120d;
-  --border:   #1c2c1c;
-  --green:    #00e676;
-  --gdim:     #003d15;
-  --amber:    #ffab00;
-  --adim:     #3d2900;
-  --red:      #ff5252;
-  --rdim:     #3d0000;
-  --muted:    #2e4a2e;
-  --mtxt:     #4a7a4a;
-  --mono:     'Courier New', Courier, monospace;
-  --sans:     -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+:root{
+  --bg:#080c08;--panel:#0d120d;--border:#1e301e;
+  --green:#00e676;--gdim:#003d15;
+  --amber:#ffab00;--adim:#3d2900;
+  --red:#ff5252;--rdim:#3d0000;
+  --muted:#6a9a6a;--mtxt:#7ab87a;
+  --mono:'Courier New',Courier,monospace;
+  --sans:-apple-system,'Segoe UI',sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;background:var(--bg);overflow:hidden}
-#app{height:100vh;display:flex;flex-direction:column;overflow:hidden;color:var(--green);font-family:var(--sans)}
+#app{height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden;color:var(--green);font-family:var(--sans)}
+#ipad-shell{display:none}
 
 /* ── FLASH + CD OVERLAY ── */
 #flash{position:fixed;inset:0;background:rgba(0,230,118,.14);pointer-events:none;opacity:0;z-index:300;transition:opacity .05s}
 #flash.on{opacity:1}
-#cdbox{position:fixed;inset:0;background:rgba(6,10,6,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;pointer-events:none;opacity:0;transition:opacity .15s}
+#flash.white{background:rgba(255,255,255,.85)}
+/* Default: full-screen (phone) */
+#cdbox{position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(6,10,6,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;pointer-events:none;opacity:0;transition:opacity .15s;border-radius:0}
 #cdbox.on{opacity:1}
-#cdlabel{font-family:var(--mono);font-size:.9rem;letter-spacing:.25em;color:var(--muted);text-transform:uppercase;margin-bottom:10px}
-#cdnum{font-family:var(--mono);font-size:min(28vw,10rem);color:var(--green);line-height:1;transition:transform .08s}
-#cdnum.pop{transform:scale(1.2)}
+#cdlabel{font-family:var(--mono);font-size:.75rem;letter-spacing:.3em;color:var(--muted);text-transform:uppercase;margin-bottom:16px}
+#cd-ring-wrap{position:relative;width:min(55vw,220px);height:min(55vw,220px);display:flex;align-items:center;justify-content:center}
+#cd-svg{position:absolute;inset:0;width:100%;height:100%}
+#cdnum{font-family:var(--mono);font-size:min(18vw,72px);color:var(--green);line-height:1;position:relative;z-index:1;transition:transform .06s}
+#cdnum.pop{transform:scale(1.15)}
+/* iPad: corner widget */
+@media (min-width:768px) and (orientation:landscape){
+  #cdbox{
+    top:12px;right:12px;bottom:auto;left:auto;
+    width:160px;height:160px;
+    border-radius:50%;
+    background:rgba(6,10,6,.95);
+    border:1px solid var(--border);
+  }
+  #cdlabel{position:absolute;top:18%;font-size:.52rem;margin-bottom:0;letter-spacing:.18em}
+  #cd-ring-wrap{width:80%;height:80%}
+  #cdnum{font-size:44px}
+}
 
-/* ── NAV TABS ── */
+/* ── PROGRESS BAR (far left) ── */
+#progress-bar-wrap{
+  width:12px;
+  background:var(--panel);
+  border-right:1px solid var(--border);
+  flex-shrink:0;
+  position:relative;
+}
+#progress-bar{
+  width:100%;
+  background:var(--green);
+  transition:height .5s linear;
+  position:absolute;
+  top:0;left:0;
+  height:0%;
+}
+.pb-tick{
+  position:absolute;
+  left:0;width:100%;
+  height:2px;
+  background:var(--amber);
+  opacity:.7;
+  pointer-events:none;
+}
+
+/* ── SHARED TABS + NAVBAR ── */
 .tabs{display:flex;gap:6px;flex-shrink:0}
-.tab{background:none;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:.6rem;letter-spacing:.1em;padding:5px 11px;border-radius:3px;cursor:pointer;text-transform:uppercase;transition:all .15s}
+.tab{background:none;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:.6rem;letter-spacing:.1em;padding:5px 11px;border-radius:3px;cursor:pointer;text-transform:uppercase;transition:color .15s,background .15s,border-color .15s}
 .tab.on{background:var(--gdim);border-color:var(--green);color:var(--green)}
 .tab:active{opacity:.7}
-
-/* ── SCREEN ── */
-.screen{display:none;flex-direction:column;height:100vh;padding:14px;overflow:hidden}
-.screen.on{display:flex}
-
-/* ── NAV BAR ── */
 .navbar{display:flex;justify-content:space-between;align-items:center;padding-bottom:11px;border-bottom:1px solid var(--border);margin-bottom:14px;flex-shrink:0}
 .navbar-title{font-family:var(--mono);font-size:.68rem;letter-spacing:.2em;color:var(--muted);text-transform:uppercase}
 
-/* ── SETTINGS ── */
-.srow{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid var(--border);flex-shrink:0}
-.srow label{font-size:.78rem;color:var(--mtxt)}
+/* ── SHARED DIGIT CONTROLS ── */
 .dgroup{display:flex;align-items:center;gap:2px}
 .dsep{color:var(--muted);font-family:var(--mono);font-size:1.2rem;padding:0 2px;line-height:1}
 .dbox{display:flex;flex-direction:column;align-items:center}
-.darr{background:none;border:none;color:var(--muted);font-size:.6rem;padding:4px 8px;cursor:pointer;line-height:1;touch-action:manipulation}
+.darr{background:none;border:none;color:var(--muted);font-size:.7rem;padding:8px 12px;line-height:1;touch-action:manipulation}
 .darr:active{color:var(--green)}
 .dval{font-family:var(--mono);font-size:1.35rem;color:var(--amber);background:var(--panel);border:1px solid var(--border);border-radius:3px;width:2.2ch;text-align:center;padding:4px 0;line-height:1}
 
-/* ── TOGGLE ── */
-.tgl{position:relative;width:44px;height:24px;cursor:pointer;flex-shrink:0}
+/* ── SHARED TOGGLE ── */
+.tgl{position:relative;width:44px;height:24px;flex-shrink:0}
 .tgl input{opacity:0;width:0;height:0;position:absolute}
-.tslider{position:absolute;inset:0;border-radius:24px;background:var(--border);border:1px solid var(--border);transition:all .2s}
-.tslider:before{content:'';position:absolute;width:18px;height:18px;left:2px;top:2px;border-radius:50%;background:var(--muted);transition:all .2s}
+.tslider{position:absolute;inset:0;border-radius:24px;background:var(--border);border:1px solid var(--border);transition:background .2s,border-color .2s}
+.tslider:before{content:'';position:absolute;width:18px;height:18px;left:2px;top:2px;border-radius:50%;background:var(--muted);transition:transform .2s,background .2s}
 .tgl input:checked+.tslider{background:var(--gdim);border-color:var(--green)}
 .tgl input:checked+.tslider:before{transform:translateX(20px);background:var(--green)}
 
-/* ── LANDMARKS ── */
+/* ── SHARED ACTION BUTTON ── */
+.action-area{padding-top:11px;flex-shrink:0;position:relative;z-index:250}
+.abtn{width:100%;padding:22px;border-radius:4px;font-family:var(--mono);font-size:1.1rem;letter-spacing:.2em;text-transform:uppercase;border:2px solid;transition:filter .1s;touch-action:manipulation;user-select:none}
+.abtn:active{filter:brightness(1.5)}
+.abtn.start{background:var(--gdim);border-color:var(--green);color:var(--green)}
+.abtn.lap{background:var(--adim);border-color:var(--amber);color:var(--amber)}
+.abtn.finish{background:var(--rdim);border-color:var(--red);color:var(--red)}
+.abtn.reset{background:var(--panel);border-color:var(--muted);color:var(--muted)}
+.abtn.primary{background:var(--gdim);border-color:var(--green);color:var(--green);margin-top:auto}
+.hint{text-align:center;font-size:.72rem;letter-spacing:.1em;color:var(--muted);margin-top:6px;text-transform:uppercase}
+
+/* ── SHARE ROW ── */
+.share-row{display:flex;gap:8px;margin-top:10px;flex-shrink:0}
+.share-btn{flex:1;padding:9px;background:none;border:1px solid var(--border);border-radius:3px;color:var(--muted);font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;touch-action:manipulation}
+.share-btn:active{border-color:var(--green);color:var(--green)}
+.share-url{width:100%;margin-top:7px;padding:8px 10px;background:var(--panel);border:1px solid var(--border);border-radius:3px;color:var(--amber);font-family:var(--mono);font-size:.65rem;word-break:break-all;display:none}
+
+/* ════════════════════════════════════════════════
+   PHONE LAYOUT  (default)
+   ════════════════════════════════════════════════ */
+.screen{display:none;flex-direction:column;height:100vh;height:100dvh;padding:14px;padding-bottom:calc(14px + env(safe-area-inset-bottom));overflow:hidden}
+.screen.on{display:flex}
+
+/* phone settings */
+.srow{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid var(--border);flex-shrink:0}
+.srow label{font-size:.78rem;color:var(--mtxt)}
+
+/* phone landmarks */
 .lm-list{flex:1;overflow-y:auto;margin-bottom:10px}
 .lm-item{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)}
 .lm-name{font-family:var(--mono);font-size:.85rem;color:var(--amber);width:76px;flex-shrink:0;letter-spacing:.04em}
-.lm-meta{flex:1;font-size:.7rem;color:var(--muted);line-height:1.6}
-.lm-disp{color:#4a8a4a;font-family:var(--mono)}
-.lm-del{background:none;border:1px solid var(--border);color:var(--muted);font-size:.7rem;padding:4px 8px;border-radius:3px;cursor:pointer;flex-shrink:0;touch-action:manipulation}
+.lm-meta{flex:1;font-size:.75rem;color:var(--muted);line-height:1.7}
+.lm-disp{color:#5aaa5a;font-family:var(--mono)}
+.lm-del{background:none;border:1px solid var(--border);color:var(--muted);font-size:.7rem;padding:4px 8px;border-radius:3px;touch-action:manipulation}
 .lm-del:active{color:var(--red);border-color:var(--red)}
 .lm-empty{text-align:center;color:var(--muted);padding:28px 0;font-size:.75rem;letter-spacing:.08em}
 .add-box{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:13px;flex-shrink:0}
@@ -80,70 +136,254 @@ html,body{height:100%;background:var(--bg);overflow:hidden}
 .add-row span{font-size:.75rem;color:var(--mtxt)}
 input.name-in{background:var(--bg);border:1px solid var(--gdim);border-radius:2px;color:var(--amber);font-family:var(--mono);font-size:1rem;padding:6px 10px;width:128px;outline:none;text-transform:uppercase;letter-spacing:.04em}
 input.name-in:focus{border-color:var(--green)}
+input.name-in::placeholder{color:var(--muted);text-transform:none;letter-spacing:.02em;font-size:.85rem}
 
-/* ── RACE ── */
+/* phone race */
 .lap-rows{display:flex;flex-direction:column;gap:9px;flex:1;justify-content:center}
-.lap-row{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:4px;border:1px solid transparent;transition:all .2s}
+.lap-row{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:4px;border:1px solid transparent;transition:opacity .2s,border-color .2s,background .2s}
 .lap-row.active{border-color:var(--gdim);background:#0a160a}
-.lap-row.inactive{opacity:.2}
-.lap-row.done{opacity:.55}
-.lap-label{font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);width:42px;flex-shrink:0}
-.lap-row.active .lap-label{color:#4a8a4a}
+.lap-row.inactive{opacity:.28}
+.lap-row.done{opacity:.65}
+.lap-label{font-size:.72rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);width:42px;flex-shrink:0}
+.lap-row.active .lap-label{color:var(--green)}
 .lap-time{font-family:var(--mono);flex:1;letter-spacing:.03em}
 .lap-row.active .lap-time{font-size:clamp(2.2rem,9vw,3.4rem);color:var(--green)}
 .lap-row.inactive .lap-time,.lap-row.done .lap-time{font-size:clamp(1.1rem,4.5vw,1.7rem)}
-.t-neg{color:var(--green)}
-.t-pos{color:var(--red)}
-.t-zero{color:var(--green)}
 
-/* ── NAVIGATOR ── */
+/* phone navigator chips */
 .chips{display:flex;gap:7px;margin-bottom:9px;flex-shrink:0}
 .chip{flex:1;background:var(--panel);border:1px solid var(--border);border-radius:3px;padding:6px 7px;text-align:center}
 .chip.active{border-color:var(--gdim)}
 .chip.done{opacity:.45}
 .chip.dim{opacity:.3}
-.chip-lbl{font-size:.52rem;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:2px}
-.chip-t{font-family:var(--mono);font-size:.82rem;color:var(--green);display:block}
+.chip-lbl{font-size:.65rem;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:3px}
+.chip-t{font-family:var(--mono);font-size:.95rem;color:var(--green);display:block}
 .nav-lms{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:5px}
-.nav-lm{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:4px;border:1px solid transparent;transition:all .25s}
+.nav-lm{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:4px;border:1px solid transparent;transition:opacity .25s,border-color .25s,background .25s}
 .nav-lm.next{border-color:var(--adim);background:#1a1000}
 .nav-lm.next.fin{border-color:var(--rdim);background:#1a0000}
-.nav-lm.passed{opacity:.16}
-.nav-lm.upcoming{opacity:.32}
-.nav-nm{font-family:var(--mono);font-size:.9rem;color:var(--amber);width:76px;flex-shrink:0}
-.nav-lm.next .nav-nm{font-size:1rem;color:var(--amber)}
+.nav-lm.passed{opacity:.18}
+.nav-lm.upcoming{opacity:.45}
+.nav-nm{font-family:var(--mono);font-size:.95rem;color:var(--amber);width:76px;flex-shrink:0}
+.nav-lm.next .nav-nm{font-size:1.05rem}
 .nav-lm.next.fin .nav-nm{color:var(--red)}
 .nav-lm.passed .nav-nm{color:var(--muted)}
-.nav-dv{font-family:var(--mono);font-size:.98rem;color:#4a8a4a;flex:1}
-.nav-lm.next .nav-dv{font-size:1.08rem;color:var(--green)}
+.nav-dv{font-family:var(--mono);font-size:1rem;color:#5aaa5a;flex:1}
+.nav-lm.next .nav-dv{font-size:1.1rem;color:var(--green)}
 .nav-lm.next.fin .nav-dv{color:var(--red)}
 .nav-lm.passed .nav-dv{color:var(--muted);text-decoration:line-through}
 
-/* ── RESULT ── */
+/* phone result */
 .res-rows{display:flex;flex-direction:column;gap:11px;flex:1;justify-content:center}
 .res-row{display:flex;align-items:center;gap:11px;padding:12px;border:1px solid var(--border);border-radius:4px}
-.res-lbl{font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);width:42px;flex-shrink:0}
-.res-t{font-family:var(--mono);font-size:clamp(1.6rem,6vw,2.2rem);flex:1}
+.res-lbl{font-size:.75rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);width:42px;flex-shrink:0}
+.res-t{font-family:var(--mono);font-size:clamp(1.6rem,6vw,2.2rem);flex:1;color:var(--green)}
 .penalty-row{border-top:1px solid var(--border);padding-top:14px;margin-bottom:11px;display:flex;justify-content:space-between;align-items:baseline;flex-shrink:0}
-.penalty-lbl{font-size:.68rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--muted)}
+.penalty-lbl{font-size:.75rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--muted)}
 .penalty-val{font-family:var(--mono);font-size:clamp(1.8rem,7vw,2.6rem);color:var(--amber)}
 
-/* ── ACTION BUTTON ── */
-.action-area{padding-top:11px;flex-shrink:0}
-.abtn{width:100%;padding:17px;border-radius:4px;font-family:var(--mono);font-size:1rem;letter-spacing:.2em;text-transform:uppercase;cursor:pointer;border:2px solid;transition:filter .1s;touch-action:manipulation;user-select:none}
-.abtn:active{filter:brightness(1.5)}
-.abtn.start{background:var(--gdim);border-color:var(--green);color:var(--green)}
-.abtn.lap{background:var(--adim);border-color:var(--amber);color:var(--amber)}
-.abtn.finish{background:var(--rdim);border-color:var(--red);color:var(--red)}
-.abtn.reset{background:var(--panel);border-color:var(--muted);color:var(--muted)}
-.abtn.primary{background:var(--gdim);border-color:var(--green);color:var(--green);margin-top:auto}
-.hint{text-align:center;font-size:.58rem;letter-spacing:.1em;color:var(--muted);margin-top:5px;text-transform:uppercase}
+/* ════════════════════════════════════════════════
+   IPAD LAYOUT  min-width:768px + landscape
+   ════════════════════════════════════════════════ */
+@media (min-width:768px) and (orientation:landscape){
 
-/* ── SHARE ROW ── */
-.share-row{display:flex;gap:8px;margin-top:10px;flex-shrink:0}
-.share-btn{flex:1;padding:9px;background:none;border:1px solid var(--border);border-radius:3px;color:var(--muted);font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;cursor:pointer;text-transform:uppercase;touch-action:manipulation}
-.share-btn:active{border-color:var(--green);color:var(--green)}
-.share-url{width:100%;margin-top:7px;padding:8px 10px;background:var(--panel);border:1px solid var(--border);border-radius:3px;color:var(--amber);font-family:var(--mono);font-size:.65rem;word-break:break-all;display:none}
+  /* hide phone-only screens, show ipad shell */
+  #s-settings.screen,#s-landmarks.screen,#s-race.screen,#s-result.screen{
+    display:none !important;
+  }
+
+  /* ── IPAD SHELL ── */
+  #ipad-shell{
+    display:flex;
+    flex-direction:row;
+    height:100vh;height:100dvh;
+    padding:0;
+    overflow:hidden;
+  }
+
+  /* ── PROGRESS BAR (far left) ── */
+  #progress-bar-wrap{
+    width:12px;
+    background:var(--panel);
+    border-right:1px solid var(--border);
+    flex-shrink:0;
+    position:relative;
+  }
+  #progress-bar{
+    width:100%;
+    background:var(--green);
+    transition:height .5s linear;
+    position:absolute;
+    top:0;left:0;
+    height:0%;
+  }
+
+  /* ── LEFT PANEL ── */
+  #ipad-left{
+    flex:0 0 55%;
+    display:flex;
+    flex-direction:column;
+    padding:16px 16px 16px 12px;
+    border-right:1px solid var(--border);
+    overflow:hidden;
+  }
+
+  /* ipad settings strip */
+  #ipad-settings-strip{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    padding-bottom:12px;
+    border-bottom:1px solid var(--border);
+    margin-bottom:12px;
+    flex-shrink:0;
+    flex-wrap:wrap;
+  }
+  .ipad-sfield{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.72rem;
+    color:var(--mtxt);
+  }
+  .ipad-sfield.locked .dval{color:var(--muted);border-color:var(--border)}
+  .ipad-sfield.locked .darr{opacity:0;pointer-events:none}
+  #ipad-settings-strip .tgl{margin-left:4px}
+  #ipad-settings-strip label.tgl-lbl{font-size:.68rem;color:var(--muted)}
+
+  /* ipad landmark table */
+  #ipad-lm-table-wrap{
+    flex:1;
+    overflow-y:auto;
+    display:flex;
+    flex-direction:column;
+  }
+  .ipad-tbl{
+    width:100%;
+    border-collapse:collapse;
+    font-family:var(--mono);
+    font-size:.78rem;
+  }
+  .ipad-tbl thead th{
+    font-size:.6rem;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--muted);
+    padding:6px 8px;
+    border-bottom:1px solid var(--border);
+    text-align:left;
+    font-weight:normal;
+    background:var(--panel);
+    position:sticky;top:0;
+  }
+  .ipad-tbl tbody tr{
+    border-bottom:1px solid var(--border);
+    transition:background .2s,opacity .25s;
+  }
+  .ipad-tbl tbody tr.lm-next{background:#1a1000}
+  .ipad-tbl tbody tr.lm-next.lm-fin{background:#1a0000}
+  .ipad-tbl tbody tr.lm-passed{opacity:.2}
+  .ipad-tbl tbody tr.lm-upcoming{opacity:.45}
+  .ipad-tbl td{
+    padding:9px 8px;
+    vertical-align:middle;
+  }
+  .ipad-tbl td.td-name{color:var(--amber);font-size:.85rem;letter-spacing:.04em}
+  .ipad-tbl tr.lm-next td.td-name{color:var(--amber);font-size:.9rem}
+  .ipad-tbl tr.lm-next.lm-fin td.td-name{color:var(--red)}
+  .ipad-tbl tr.lm-passed td.td-name{color:var(--muted)}
+  .ipad-tbl td.td-m{color:var(--muted);text-align:right;width:60px}
+  .ipad-tbl td.td-rem{color:#5aaa5a;width:110px}
+  .ipad-tbl tr.lm-next td.td-rem{color:var(--green);font-size:.9rem}
+  .ipad-tbl tr.lm-next.lm-fin td.td-rem{color:var(--red)}
+  .ipad-tbl tr.lm-passed td.td-rem{color:var(--muted);text-decoration:line-through}
+  .ipad-tbl td.td-cd{color:var(--muted);font-size:.72rem;width:110px}
+  /* edit controls in table */
+  .ipad-tbl td input.td-edit{
+    background:none;border:none;border-bottom:1px solid var(--gdim);
+    color:var(--amber);font-family:var(--mono);font-size:.82rem;
+    width:100%;outline:none;text-transform:uppercase;padding:2px 0;
+  }
+  .ipad-tbl td input.td-edit:focus{border-bottom-color:var(--green)}
+  .ipad-tbl td.td-del{width:32px;text-align:center}
+  .ipad-tbl td.td-del button{
+    background:none;border:none;color:var(--muted);font-size:.75rem;
+    padding:4px;touch-action:manipulation;
+  }
+  .ipad-tbl td.td-del button:active{color:var(--red)}
+
+  /* add landmark row at bottom of table */
+  #ipad-add-row{
+    display:flex;align-items:center;gap:10px;
+    padding:10px 8px;border-top:1px solid var(--border);
+    flex-shrink:0;
+  }
+  #ipad-add-row span{font-size:.65rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
+  #ipad-lm-name{
+    background:var(--bg);border:1px solid var(--gdim);border-radius:2px;
+    color:var(--amber);font-family:var(--mono);font-size:.85rem;
+    padding:5px 8px;width:110px;outline:none;text-transform:uppercase;
+  }
+  #ipad-lm-name:focus{border-color:var(--green)}
+  #ipad-lm-name::placeholder{color:var(--muted);text-transform:none;font-size:.75rem}
+  #ipad-add-row button.add-lm-btn{
+    padding:6px 14px;background:var(--gdim);border:1px solid var(--green);
+    border-radius:3px;color:var(--green);font-family:var(--mono);
+    font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;
+    touch-action:manipulation;white-space:nowrap;
+  }
+
+  /* ── RIGHT PANEL ── */
+  #ipad-right{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    padding:16px;
+    overflow:hidden;
+  }
+
+  /* ipad navbar */
+  #ipad-navbar{
+    display:flex;justify-content:space-between;align-items:center;
+    padding-bottom:10px;border-bottom:1px solid var(--border);margin-bottom:12px;flex-shrink:0;
+  }
+  #ipad-race-title{font-family:var(--mono);font-size:.68rem;letter-spacing:.2em;color:var(--muted);text-transform:uppercase}
+
+  /* lap timers */
+  #ipad-lap-rows{
+    display:flex;flex-direction:column;gap:8px;flex:1;justify-content:center;
+  }
+  .ipad-lap-row{
+    display:flex;align-items:center;gap:12px;padding:8px 12px;
+    border-radius:4px;border:1px solid transparent;
+    transition:opacity .2s,border-color .2s,background .2s;
+  }
+  .ipad-lap-row.active{border-color:var(--gdim);background:#0a160a}
+  .ipad-lap-row.inactive{opacity:.28}
+  .ipad-lap-row.done{opacity:.65}
+  .ipad-lap-lbl{font-size:.72rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);width:48px;flex-shrink:0}
+  .ipad-lap-row.active .ipad-lap-lbl{color:var(--green)}
+  .ipad-lap-t{font-family:var(--mono);flex:1;letter-spacing:.03em}
+  .ipad-lap-row.active .ipad-lap-t{font-size:clamp(2.8rem,6vw,5rem);color:var(--green)}
+  .ipad-lap-row.inactive .ipad-lap-t,.ipad-lap-row.done .ipad-lap-t{font-size:clamp(1.2rem,2.8vw,2rem)}
+
+  /* ipad result summary (shown after finish) */
+  #ipad-result-summary{
+    display:none;
+    flex-direction:column;gap:6px;
+    border-top:1px solid var(--border);
+    padding-top:10px;flex-shrink:0;
+    margin-bottom:4px;
+  }
+  #ipad-result-summary.on{display:flex}
+  .ipad-res-row{display:flex;align-items:center;gap:10px}
+  .ipad-res-lbl{font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);width:42px;flex-shrink:0}
+  .ipad-res-t{font-family:var(--mono);font-size:1.1rem;color:var(--green);flex:1}
+  .ipad-penalty-row{display:flex;justify-content:space-between;align-items:baseline;padding-top:6px;border-top:1px solid var(--border)}
+  .ipad-penalty-lbl{font-size:.68rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--muted)}
+  .ipad-penalty-val{font-family:var(--mono);font-size:1.6rem;color:var(--amber)}
+}
+/* END IPAD MEDIA QUERY */
 </style>
 </head>
 <body>
@@ -151,10 +391,27 @@ input.name-in:focus{border-color:var(--green)}
   <div id="flash"></div>
   <div id="cdbox">
     <div id="cdlabel"></div>
-    <div id="cdnum"></div>
+    <div id="cd-ring-wrap">
+      <svg id="cd-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="100" cy="100" r="90" fill="none" stroke="#1a2a1a" stroke-width="1"/>
+        <circle id="cd-ring" cx="100" cy="100" r="80"
+          fill="none" stroke="#00e676" stroke-width="6"
+          stroke-linecap="butt" stroke-dasharray="502.65" stroke-dashoffset="0"
+          transform="rotate(-90 100 100)"/>
+        <line x1="100" y1="12" x2="100" y2="28" stroke="#1e3a1e" stroke-width="1.5"/>
+        <line x1="100" y1="172" x2="100" y2="188" stroke="#1e3a1e" stroke-width="1.5"/>
+        <line x1="12" y1="100" x2="28" y2="100" stroke="#1e3a1e" stroke-width="1.5"/>
+        <line x1="172" y1="100" x2="188" y2="100" stroke="#1e3a1e" stroke-width="1.5"/>
+      </svg>
+      <div id="cdnum"></div>
+    </div>
   </div>
 
-  <!-- ── SETTINGS ── -->
+  <!-- ══════════════════════════════════════════
+       PHONE SCREENS
+  ══════════════════════════════════════════ -->
+
+  <!-- SETTINGS -->
   <div id="s-settings" class="screen on">
     <div class="navbar">
       <span class="navbar-title">Settings</span>
@@ -164,7 +421,6 @@ input.name-in:focus{border-color:var(--green)}
         <button class="tab" onclick="gotoRace()">Race</button>
       </div>
     </div>
-
     <div class="srow">
       <label>Ideal Lap Time</label>
       <div class="dgroup">
@@ -178,12 +434,10 @@ input.name-in:focus{border-color:var(--green)}
         <div class="dbox"><button class="darr" onclick="adj('ltH1',1)">▲</button><div class="dval" id="ltH1">0</div><button class="darr" onclick="adj('ltH1',-1)">▼</button></div>
       </div>
     </div>
-
     <div class="srow">
       <label>Number of Laps</label>
       <div class="dbox"><button class="darr" onclick="adj('nLaps',1,9,1)">▲</button><div class="dval" id="nLaps">3</div><button class="darr" onclick="adj('nLaps',-1,9,1)">▼</button></div>
     </div>
-
     <div class="srow">
       <label>Track Length (m)</label>
       <div class="dgroup">
@@ -193,27 +447,23 @@ input.name-in:focus{border-color:var(--green)}
         <div class="dbox"><button class="darr" onclick="adj('trk3',1)">▲</button><div class="dval" id="trk3">4</div><button class="darr" onclick="adj('trk3',-1)">▼</button></div>
       </div>
     </div>
-
     <div class="srow">
       <label>Lap/Finish countdown (10 beeps)</label>
       <label class="tgl"><input type="checkbox" id="lapCd" checked><span class="tslider"></span></label>
     </div>
-
     <div class="srow" style="border-bottom:none">
       <label>Landmark countdown (10 beeps)</label>
       <label class="tgl"><input type="checkbox" id="lmCd" checked><span class="tslider"></span></label>
     </div>
-
     <div class="share-row">
-      <button class="share-btn" onclick="saveUrl()">⎘ Copy settings URL</button>
-      <button class="share-btn" onclick="saveLocal()">💾 Save to device</button>
+      <button class="share-btn" onclick="saveUrl()">Copy settings URL</button>
+      <button class="share-btn" onclick="saveLocal()">Save to device</button>
     </div>
     <div id="share-url-display" class="share-url"></div>
-
-    <button class="abtn primary" style="margin-top:16px" onclick="gotoRace()">▶ Go to Race</button>
+    <button class="abtn primary" style="margin-top:16px" onclick="gotoRace()">Go to Race</button>
   </div>
 
-  <!-- ── LANDMARKS ── -->
+  <!-- LANDMARKS -->
   <div id="s-landmarks" class="screen">
     <div class="navbar">
       <span class="navbar-title">Landmarks</span>
@@ -228,7 +478,7 @@ input.name-in:focus{border-color:var(--green)}
       <div class="add-title">Add Landmark</div>
       <div class="add-row">
         <span>Name (max 8)</span>
-        <input class="name-in" id="lm-name" maxlength="8" placeholder="BRIDGE" autocomplete="off" autocorrect="off" spellcheck="false">
+        <input class="name-in" id="lm-name" maxlength="8" placeholder="e.g. BRIDGE" autocomplete="off" autocorrect="off" spellcheck="false">
       </div>
       <div class="add-row">
         <span>Distance (m)</span>
@@ -243,18 +493,16 @@ input.name-in:focus{border-color:var(--green)}
     </div>
   </div>
 
-  <!-- ── RACE ── -->
+  <!-- RACE (phone) -->
   <div id="s-race" class="screen">
     <div class="navbar" style="margin-bottom:8px">
       <span class="navbar-title" id="race-title">Ready</span>
       <div class="tabs">
         <button class="tab on" id="tab-timer" onclick="setView('timer')">Timer</button>
         <button class="tab" id="tab-nav" onclick="setView('nav')">Navigator</button>
-        <button class="tab" onclick="abortRace()">⚙</button>
+        <button class="tab" id="tab-settings-race" onclick="abortRace()">Settings</button>
       </div>
     </div>
-
-    <!-- Timer view -->
     <div id="view-timer" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
       <div class="lap-rows" id="lap-rows"></div>
       <div class="action-area">
@@ -262,8 +510,6 @@ input.name-in:focus{border-color:var(--green)}
         <div class="hint" id="ahint"></div>
       </div>
     </div>
-
-    <!-- Navigator view -->
     <div id="view-nav" style="display:none;flex-direction:column;flex:1;overflow:hidden">
       <div class="chips" id="nav-chips"></div>
       <div class="nav-lms" id="nav-lms"></div>
@@ -274,7 +520,7 @@ input.name-in:focus{border-color:var(--green)}
     </div>
   </div>
 
-  <!-- ── RESULT ── -->
+  <!-- RESULT (phone) -->
   <div id="s-result" class="screen">
     <div class="navbar">
       <span class="navbar-title">Result</span>
@@ -290,80 +536,194 @@ input.name-in:focus{border-color:var(--green)}
     </div>
     <button class="abtn reset" onclick="gotoRace()">RESET</button>
   </div>
-</div>
+
+  <!-- ══════════════════════════════════════════
+       IPAD SHELL (landscape only)
+  ══════════════════════════════════════════ -->
+  <div id="ipad-shell">
+
+    <!-- progress bar -->
+    <div id="progress-bar-wrap">
+      <div id="progress-bar"></div>
+    </div>
+
+    <!-- left panel -->
+    <div id="ipad-left">
+      <!-- settings strip -->
+      <div id="ipad-settings-strip">
+        <div class="ipad-sfield" id="ipad-sf-time">
+          <span>Lap Time</span>
+          <div class="dgroup">
+            <div class="dbox"><button class="darr" onclick="adj('ltM0',1)">▲</button><div class="dval" id="i-ltM0">0</div><button class="darr" onclick="adj('ltM0',-1)">▼</button></div>
+            <div class="dbox"><button class="darr" onclick="adj('ltM1',1)">▲</button><div class="dval" id="i-ltM1">4</div><button class="darr" onclick="adj('ltM1',-1)">▼</button></div>
+            <span class="dsep">:</span>
+            <div class="dbox"><button class="darr" onclick="adj('ltS0',1,5)">▲</button><div class="dval" id="i-ltS0">1</div><button class="darr" onclick="adj('ltS0',-1,5)">▼</button></div>
+            <div class="dbox"><button class="darr" onclick="adj('ltS1',1)">▲</button><div class="dval" id="i-ltS1">9</div><button class="darr" onclick="adj('ltS1',-1)">▼</button></div>
+            <span class="dsep">.</span>
+            <div class="dbox"><button class="darr" onclick="adj('ltH0',1,9)">▲</button><div class="dval" id="i-ltH0">0</div><button class="darr" onclick="adj('ltH0',-1,9)">▼</button></div>
+            <div class="dbox"><button class="darr" onclick="adj('ltH1',1)">▲</button><div class="dval" id="i-ltH1">0</div><button class="darr" onclick="adj('ltH1',-1)">▼</button></div>
+          </div>
+        </div>
+        <div class="ipad-sfield" id="ipad-sf-laps">
+          <span>Laps</span>
+          <div class="dbox"><button class="darr" onclick="adj('nLaps',1,9,1)">▲</button><div class="dval" id="i-nLaps">3</div><button class="darr" onclick="adj('nLaps',-1,9,1)">▼</button></div>
+        </div>
+        <div class="ipad-sfield" id="ipad-sf-track">
+          <span>Track (m)</span>
+          <div class="dgroup">
+            <div class="dbox"><button class="darr" onclick="adj('trk0',1)">▲</button><div class="dval" id="i-trk0">2</div><button class="darr" onclick="adj('trk0',-1)">▼</button></div>
+            <div class="dbox"><button class="darr" onclick="adj('trk1',1)">▲</button><div class="dval" id="i-trk1">0</div><button class="darr" onclick="adj('trk1',-1)">▼</button></div>
+            <div class="dbox"><button class="darr" onclick="adj('trk2',1)">▲</button><div class="dval" id="i-trk2">9</div><button class="darr" onclick="adj('trk2',-1)">▼</button></div>
+            <div class="dbox"><button class="darr" onclick="adj('trk3',1)">▲</button><div class="dval" id="i-trk3">4</div><button class="darr" onclick="adj('trk3',-1)">▼</button></div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
+          <span class="ipad-sfield" style="gap:6px">
+            <label class="tgl-lbl" style="font-size:.65rem;color:var(--muted)">Lap cd</label>
+            <label class="tgl"><input type="checkbox" id="i-lapCd" checked onchange="syncCd('lapCd',this)"><span class="tslider"></span></label>
+          </span>
+          <span class="ipad-sfield" style="gap:6px">
+            <label class="tgl-lbl" style="font-size:.65rem;color:var(--muted)">LM cd</label>
+            <label class="tgl"><input type="checkbox" id="i-lmCd" checked onchange="syncCd('lmCd',this)"><span class="tslider"></span></label>
+          </span>
+        </div>
+      </div>
+
+      <!-- landmark table -->
+      <div id="ipad-lm-table-wrap">
+        <table class="ipad-tbl" id="ipad-lm-tbl">
+          <thead>
+            <tr>
+              <th>Landmark</th>
+              <th>Meters</th>
+              <th>Time Remaining</th>
+              <th>Countdown Start</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="ipad-lm-tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- add row -->
+      <div id="ipad-add-row">
+        <span>Add:</span>
+        <input id="ipad-lm-name" maxlength="8" placeholder="e.g. BRIDGE" autocomplete="off" autocorrect="off" spellcheck="false">
+        <div class="dgroup" style="gap:2px">
+          <div class="dbox"><button class="darr" onclick="adj('lmD0',1)">▲</button><div class="dval" id="i-lmD0">0</div><button class="darr" onclick="adj('lmD0',-1)">▼</button></div>
+          <div class="dbox"><button class="darr" onclick="adj('lmD1',1)">▲</button><div class="dval" id="i-lmD1">0</div><button class="darr" onclick="adj('lmD1',-1)">▼</button></div>
+          <div class="dbox"><button class="darr" onclick="adj('lmD2',1)">▲</button><div class="dval" id="i-lmD2">0</div><button class="darr" onclick="adj('lmD2',-1)">▼</button></div>
+          <div class="dbox"><button class="darr" onclick="adj('lmD3',1)">▲</button><div class="dval" id="i-lmD3">0</div><button class="darr" onclick="adj('lmD3',-1)">▼</button></div>
+        </div>
+        <button class="add-lm-btn" onclick="addLandmarkIpad()">+ Add</button>
+        <button class="add-lm-btn" style="margin-left:auto" onclick="saveUrl()">Copy URL</button>
+        <button class="add-lm-btn" onclick="saveLocal()">Save</button>
+      </div>
+    </div>
+
+    <!-- right panel -->
+    <div id="ipad-right">
+      <div id="ipad-navbar">
+        <span id="ipad-race-title" style="font-family:var(--mono);font-size:.68rem;letter-spacing:.2em;color:var(--muted);text-transform:uppercase">Ready</span>
+        <div class="tabs">
+          <button class="tab" id="ipad-tab-settings" onclick="ipadToggleSettings()">Settings</button>
+          <button class="tab" id="ipad-abort-btn" onclick="ipadAbort()" style="display:none">Abort</button>
+        </div>
+      </div>
+
+      <div id="ipad-lap-rows"></div>
+
+      <div id="ipad-result-summary">
+        <!-- filled by JS -->
+      </div>
+
+      <div class="action-area">
+        <button class="abtn start" id="ipad-abtn" onclick="handleAction()">START</button>
+        <div class="hint" id="ipad-ahint"></div>
+      </div>
+    </div>
+  </div><!-- /ipad-shell -->
+
+</div><!-- /app -->
 
 <script>
 // ── State ─────────────────────────────────────────────────────────────────────
-const D = {
-  ltM0:0,ltM1:4,ltS0:1,ltS1:9,ltH0:0,ltH1:0,
-  nLaps:3,
-  trk0:2,trk1:0,trk2:9,trk3:4,
-  lmD0:0,lmD1:0,lmD2:0,lmD3:0,
-};
-let landmarks = [];
-let raceView  = 'timer';
-let phase     = 'pre';   // pre | running | finished
-let curLap    = 0;
-let lapResults= [];
-let startTime = null;
-let rafId     = null;
-let firedBeeps= new Set();
-let idealSecs = 0;
-let lmsCalc   = [];
-let nLapsRace = 3;
+const D={ltM0:0,ltM1:4,ltS0:1,ltS1:9,ltH0:0,ltH1:0,nLaps:3,trk0:2,trk1:0,trk2:9,trk3:4,lmD0:0,lmD1:0,lmD2:0,lmD3:0};
+let landmarks=[];
+let phase='pre';
+let curLap=0;
+let lapResults=[];
+let startTime=null;
+let rafId=null;
+let firedBeeps=new Set();
+let idealSecs=0;
+let lmsCalc=[];
+let nLapsRace=3;
+let useLapCd=true;
+let useLmCd=true;
+let navItemsCache=[];
+const isIpad=()=>window.innerWidth>=768&&window.innerWidth>window.innerHeight;
 
 // ── Audio ─────────────────────────────────────────────────────────────────────
-let audioCtx = null;
-function getACtx(){
-  if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-  return audioCtx;
-}
+let audioCtx=null;
+function getACtx(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();return audioCtx;}
 function beep(freq,dur,vol){
-  try{
-    const c=getACtx(),o=c.createOscillator(),g=c.createGain();
-    o.connect(g);g.connect(c.destination);
-    o.type='sine';o.frequency.value=freq;
-    g.gain.setValueAtTime(vol,c.currentTime);
-    g.gain.exponentialRampToValueAtTime(.001,c.currentTime+dur);
-    o.start(c.currentTime);o.stop(c.currentTime+dur);
-  }catch(e){}
-  doFlash();
+  try{const c=getACtx(),o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.type='sine';o.frequency.value=freq;g.gain.setValueAtTime(vol,c.currentTime);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+dur);o.start(c.currentTime);o.stop(c.currentTime+dur);}catch(e){}
 }
-function doFlash(){
+function beepWithFlash(freq,dur,vol){
+  beep(freq,dur,vol);
+  const f=document.getElementById('flash');f.classList.add('on');setTimeout(()=>f.classList.remove('on'),90);
+}
+function doFinishFlash(){
   const f=document.getElementById('flash');
-  f.classList.add('on');
-  setTimeout(()=>f.classList.remove('on'),90);
+  f.classList.add('on','white');setTimeout(()=>{f.classList.remove('on','white');},120);
+  setTimeout(()=>{f.classList.add('on','white');setTimeout(()=>f.classList.remove('on','white'),120);},200);
 }
 
 // ── Countdown overlay ─────────────────────────────────────────────────────────
-let cdHide=null;
+const CIRC=2*Math.PI*80;
+let cdHide=null,cdRafId=null,cdStart=null;
 function showCd(label,num){
-  const box=document.getElementById('cdbox');
-  const n=document.getElementById('cdnum');
   document.getElementById('cdlabel').textContent=label;
-  n.textContent=num;
-  box.classList.add('on');
+  const n=document.getElementById('cdnum');n.textContent=num;
+  document.getElementById('cdbox').classList.add('on');
   n.classList.remove('pop');
   requestAnimationFrame(()=>{n.classList.add('pop');setTimeout(()=>n.classList.remove('pop'),120)});
+  if(cdRafId)cancelAnimationFrame(cdRafId);
+  cdStart=performance.now();
+  const ring=document.getElementById('cd-ring');
+  ring.setAttribute('stroke-dashoffset','0');
+  (function sweep(){const p=Math.min((performance.now()-cdStart)/1000,1);ring.setAttribute('stroke-dashoffset',p*CIRC);if(p<1)cdRafId=requestAnimationFrame(sweep);})();
   if(cdHide)clearTimeout(cdHide);
-  cdHide=setTimeout(()=>box.classList.remove('on'),860);
+  cdHide=setTimeout(()=>document.getElementById('cdbox').classList.remove('on'),880);
 }
 function hideCd(){
-  if(cdHide)clearTimeout(cdHide);
+  if(cdHide)clearTimeout(cdHide);if(cdRafId)cancelAnimationFrame(cdRafId);
   document.getElementById('cdbox').classList.remove('on');
 }
 
 // ── Digit controls ────────────────────────────────────────────────────────────
 function adj(id,delta,max=9,min=0){
   let v=parseInt(document.getElementById(id).textContent)+delta;
-  if(v>max)v=min; if(v<min)v=max;
+  if(v>max)v=min;if(v<min)v=max;
   document.getElementById(id).textContent=v;
   D[id]=v;
+  // sync ipad mirror if exists
+  const mirror=document.getElementById('i-'+id);
+  if(mirror)mirror.textContent=v;
+  // sync phone mirror
+  const phone=document.getElementById(id.replace(/^i-/,''));
+  if(id.startsWith('i-')&&phone)phone.textContent=v;
   saveLocal(true);
+  if(isIpad())renderIpadTable();
 }
-function setDval(id,v){document.getElementById(id).textContent=v;D[id]=v;}
+function setDval(id,v){
+  const el=document.getElementById(id);if(el){el.textContent=v;}
+  const mirror=document.getElementById('i-'+id);if(mirror)mirror.textContent=v;
+  D[id]=v;
+}
 
-// ── Derived values ────────────────────────────────────────────────────────────
+// ── Derived ───────────────────────────────────────────────────────────────────
 function getIdeal(){return(D.ltM0*10+D.ltM1)*60+(D.ltS0*10+D.ltS1)+(D.ltH0*10+D.ltH1)/100;}
 function getTrack(){return D.trk0*1000+D.trk1*100+D.trk2*10+D.trk3;}
 function getLmMeters(){return D.lmD0*1000+D.lmD1*100+D.lmD2*10+D.lmD3;}
@@ -374,270 +734,424 @@ function fmt(r){
   const m=Math.floor(abs/60),s=Math.floor(abs%60),h=Math.floor((abs%1)*100);
   return(over?'+':'\u2212')+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')+'.'+String(h).padStart(2,'0');
 }
-function tcls(r){return Math.abs(r)<.01?'t-zero':r<0?'t-neg':'t-pos';}
 
-// ── Screen navigation ─────────────────────────────────────────────────────────
+// ── Screen navigation (phone) ─────────────────────────────────────────────────
 function goto(name){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
   document.getElementById('s-'+name).classList.add('on');
   if(name==='landmarks')renderLandmarks();
 }
-
 function setView(v){
-  raceView=v;
   document.getElementById('view-timer').style.display=v==='timer'?'flex':'none';
   document.getElementById('view-nav').style.display=v==='nav'?'flex':'none';
   document.getElementById('tab-timer').classList.toggle('on',v==='timer');
   document.getElementById('tab-nav').classList.toggle('on',v==='nav');
 }
-
 function gotoRace(){
   if(rafId){cancelAnimationFrame(rafId);rafId=null;}
   phase='pre';curLap=0;lapResults=[];firedBeeps=new Set();
-  setView('timer');
-  buildLapRows();
-  buildNavScreen();
-  updateBtn();
-  document.getElementById('race-title').textContent='Ready';
-  goto('race');
+  if(isIpad()){
+    ipadInitRace();
+  } else {
+    setView('timer');
+    buildLapRows();
+    buildNavScreen();
+    updateBtn();
+    document.getElementById('race-title').textContent='Ready';
+    goto('race');
+  }
 }
-
 function abortRace(){
   if(rafId){cancelAnimationFrame(rafId);rafId=null;}
   phase='pre';
   goto('settings');
 }
 
-// ── Lap rows ──────────────────────────────────────────────────────────────────
+// ── Phone: Lap rows ───────────────────────────────────────────────────────────
 function buildLapRows(){
-  const ideal=getIdeal();
-  const c=document.getElementById('lap-rows');
+  const ideal=getIdeal(),c=document.getElementById('lap-rows');
   c.innerHTML='';
   for(let i=0;i<D.nLaps;i++){
     const row=document.createElement('div');
-    row.className='lap-row inactive';
-    row.id='lr'+i;
+    row.className='lap-row inactive';row.id='lr'+i;
     row.innerHTML=`<div class="lap-label">LAP ${i+1}</div><div class="lap-time" id="lt${i}">${fmt(ideal)}</div>`;
     c.appendChild(row);
   }
 }
-
 function updateLapRows(rem){
-  const ideal=getIdeal();
-  for(let i=0;i<D.nLaps;i++){
-    const row=document.getElementById('lr'+i);
-    const te=document.getElementById('lt'+i);
-    if(i<curLap){
-      row.className='lap-row done';
-      te.textContent=fmt(lapResults[i]);
-      te.className='lap-time '+tcls(lapResults[i]);
-    } else if(i===curLap&&phase==='running'){
-      row.className='lap-row active';
-      te.textContent=fmt(rem);
-      te.className='lap-time';
-    } else {
-      row.className='lap-row inactive';
-      te.textContent=fmt(ideal);
-      te.className='lap-time';
-    }
+  const ideal=idealSecs;
+  for(let i=0;i<nLapsRace;i++){
+    const row=document.getElementById('lr'+i);const te=document.getElementById('lt'+i);
+    if(i<curLap){row.className='lap-row done';te.textContent=fmt(lapResults[i]);}
+    else if(i===curLap&&phase==='running'){row.className='lap-row active';te.textContent=fmt(rem);}
+    else{row.className='lap-row inactive';te.textContent=fmt(ideal);}
   }
 }
 
-// ── Navigator screen ──────────────────────────────────────────────────────────
+// ── Phone: Navigator ──────────────────────────────────────────────────────────
+function buildNavItems(){
+  const ideal=idealSecs,track=getTrack();
+  navItemsCache=landmarks.map(lm=>({name:lm.name,trig:(lm.meters/track)*ideal,dispRem:ideal-(lm.meters/track)*ideal,isFinish:false}));
+  navItemsCache.push({name:'FINISH',trig:ideal,dispRem:0,isFinish:true});
+  navItemsCache.sort((a,b)=>a.trig-b.trig);
+}
 function buildNavScreen(){
   const ideal=getIdeal(),track=getTrack();
-  // chips
-  const cc=document.getElementById('nav-chips');
-  cc.innerHTML='';
+  const cc=document.getElementById('nav-chips');cc.innerHTML='';
   for(let i=0;i<D.nLaps;i++){
-    const ch=document.createElement('div');
-    ch.className='chip';ch.id='nch'+i;
+    const ch=document.createElement('div');ch.className='chip';ch.id='nch'+i;
     ch.innerHTML=`<span class="chip-lbl">LAP ${i+1}</span><span class="chip-t" id="nct${i}">${fmt(ideal)}</span>`;
     cc.appendChild(ch);
   }
-  // landmark rows
-  const nl=document.getElementById('nav-lms');
-  nl.innerHTML='';
-  const items=getNavItems();
-  items.forEach((item,i)=>{
-    const row=document.createElement('div');
-    row.className='nav-lm upcoming'+(item.isFinish?' fin':'');
-    row.id='nlm'+i;
+  const sorted=landmarks.map(lm=>({name:lm.name,trig:(lm.meters/track)*ideal,dispRem:ideal-(lm.meters/track)*ideal,isFinish:false}));
+  sorted.push({name:'FINISH',trig:ideal,dispRem:0,isFinish:true});
+  sorted.sort((a,b)=>a.trig-b.trig);
+  const nl=document.getElementById('nav-lms');nl.innerHTML='';
+  sorted.forEach((item,i)=>{
+    const row=document.createElement('div');row.className='nav-lm upcoming'+(item.isFinish?' fin':'');row.id='nlm'+i;
     row.innerHTML=`<div class="nav-nm">${item.name}</div><div class="nav-dv">${fmt(item.dispRem)}</div>`;
     nl.appendChild(row);
   });
 }
-
-function getNavItems(){
-  const ideal=getIdeal(),track=getTrack();
-  const items=landmarks.map(lm=>({
-    name:lm.name,
-    trig:(lm.meters/track)*ideal,
-    dispRem:ideal-(lm.meters/track)*ideal,
-    isFinish:false
-  }));
-  items.push({name:'FINISH',trig:ideal,dispRem:0,isFinish:true});
-  items.sort((a,b)=>a.trig-b.trig);
-  return items;
-}
-
 function updateNavScreen(elapsed,rem){
-  const ideal=getIdeal();
-  // chips
-  for(let i=0;i<D.nLaps;i++){
-    const ch=document.getElementById('nch'+i);
-    const ct=document.getElementById('nct'+i);
-    if(!ch)continue;
-    if(i<curLap){
-      ch.className='chip done';
-      ct.textContent=fmt(lapResults[i]);
-      ct.className='chip-t '+tcls(lapResults[i]);
-    } else if(i===curLap&&phase==='running'){
-      ch.className='chip active';
-      ct.textContent=fmt(rem);
-      ct.className='chip-t';
-    } else {
-      ch.className='chip'+(phase==='running'?' dim':'');
-      ct.textContent=fmt(ideal);
-      ct.className='chip-t';
-    }
+  const ideal=idealSecs;
+  for(let i=0;i<nLapsRace;i++){
+    const ch=document.getElementById('nch'+i);const ct=document.getElementById('nct'+i);if(!ch)continue;
+    if(i<curLap){ch.className='chip done';ct.textContent=fmt(lapResults[i]);}
+    else if(i===curLap&&phase==='running'){ch.className='chip active';ct.textContent=fmt(rem);}
+    else{ch.className='chip'+(phase==='running'?' dim':'');ct.textContent=fmt(ideal);}
   }
-  // landmark rows
-  const items=getNavItems();
-  const nextIdx=items.findIndex(x=>elapsed<x.trig);
-  items.forEach((item,i)=>{
-    const row=document.getElementById('nlm'+i);
-    if(!row)return;
+  const nextIdx=navItemsCache.findIndex(x=>elapsed<x.trig);
+  navItemsCache.forEach((item,i)=>{
+    const row=document.getElementById('nlm'+i);if(!row)return;
     const fin=item.isFinish?' fin':'';
-    const passed=phase==='running'&&elapsed>=item.trig;
-    const isNext=!passed&&i===nextIdx&&phase==='running';
-    if(passed) row.className='nav-lm passed'+fin;
-    else if(isNext) row.className='nav-lm next'+fin;
-    else row.className='nav-lm upcoming'+fin;
+    const passed=elapsed>=item.trig,isNext=!passed&&i===nextIdx;
+    row.className=passed?'nav-lm passed'+fin:isNext?'nav-lm next'+fin:'nav-lm upcoming'+fin;
   });
 }
 
-// ── Action button ─────────────────────────────────────────────────────────────
+// ── Phone: Action button ──────────────────────────────────────────────────────
 function updateBtn(){
   const isLast=curLap===D.nLaps-1;
   const type=phase==='pre'?'start':isLast?'finish':'lap';
   const lbl=phase==='pre'?'START':isLast?'FINISH':'LAP';
   const hint=phase==='running'?`Lap ${curLap+1} of ${D.nLaps}`:'';
-  ['abtn','nabtn'].forEach(id=>{
-    const b=document.getElementById(id);
-    b.className='abtn '+type;
-    b.textContent=lbl;
+  ['abtn','nabtn'].forEach(id=>{const b=document.getElementById(id);if(b){b.className='abtn '+type;b.textContent=lbl;}});
+  const ah=document.getElementById('ahint');if(ah)ah.textContent=hint;
+  const nh=document.getElementById('nahint');if(nh)nh.textContent=hint;
+  const stab=document.getElementById('tab-settings-race');
+  if(stab)stab.style.display=phase==='running'?'none':'';
+}
+
+// ── iPad: init race ───────────────────────────────────────────────────────────
+function ipadDrawTicks(){
+  const wrap=document.getElementById('progress-bar-wrap');
+  // remove old ticks
+  wrap.querySelectorAll('.pb-tick').forEach(t=>t.remove());
+  if(!idealSecs&&!getIdeal())return;
+  const ideal=idealSecs||getIdeal();
+  const track=getTrack();
+  landmarks.forEach(lm=>{
+    const pct=(lm.meters/track)*100;
+    const tick=document.createElement('div');
+    tick.className='pb-tick';
+    tick.style.top=pct+'%';
+    wrap.appendChild(tick);
   });
-  document.getElementById('ahint').textContent=hint;
-  document.getElementById('nahint').textContent=hint;
+}
+
+function ipadInitRace(){
+  ipadLockSettings(false);
+  ipadBuildLapRows();
+  ipadUpdateBtn();
+  document.getElementById('ipad-race-title').textContent='Ready';
+  document.getElementById('ipad-result-summary').classList.remove('on');
+  document.getElementById('progress-bar').style.height='0%';
+  document.getElementById('ipad-abort-btn').style.display='none';
+  document.getElementById('ipad-tab-settings').style.display='';
+  ipadDrawTicks();
+}
+
+function ipadLockSettings(locked){
+  ['ipad-sf-time','ipad-sf-laps','ipad-sf-track'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.classList.toggle('locked',locked);
+  });
+  // also lock/unlock add row
+  const addRow=document.getElementById('ipad-add-row');
+  if(addRow)addRow.style.opacity=locked?'0.3':'1';
+  if(addRow)addRow.style.pointerEvents=locked?'none':'';
+}
+
+function ipadBuildLapRows(){
+  const ideal=getIdeal(),c=document.getElementById('ipad-lap-rows');
+  c.innerHTML='';
+  for(let i=0;i<D.nLaps;i++){
+    const row=document.createElement('div');
+    row.className='ipad-lap-row inactive';row.id='ilr'+i;
+    row.innerHTML=`<div class="ipad-lap-lbl">LAP ${i+1}</div><div class="ipad-lap-t" id="ilt${i}">${fmt(ideal)}</div>`;
+    c.appendChild(row);
+  }
+}
+
+function ipadUpdateLapRows(rem){
+  for(let i=0;i<nLapsRace;i++){
+    const row=document.getElementById('ilr'+i);const te=document.getElementById('ilt'+i);
+    if(!row)continue;
+    if(i<curLap){row.className='ipad-lap-row done';te.textContent=fmt(lapResults[i]);}
+    else if(i===curLap&&phase==='running'){row.className='ipad-lap-row active';te.textContent=fmt(rem);}
+    else{row.className='ipad-lap-row inactive';te.textContent=fmt(idealSecs);}
+  }
+}
+
+function ipadUpdateBtn(){
+  const isLast=curLap===D.nLaps-1;
+  const type=phase==='pre'?'start':isLast?'finish':'lap';
+  const lbl=phase==='pre'?'START':isLast?'FINISH':'LAP';
+  const hint=phase==='running'?`Lap ${curLap+1} of ${D.nLaps}`:'';
+  const b=document.getElementById('ipad-abtn');if(b){b.className='abtn '+type;b.textContent=lbl;}
+  const h=document.getElementById('ipad-ahint');if(h)h.textContent=hint;
+  if(phase==='running'){
+    document.getElementById('ipad-tab-settings').style.display='none';
+    document.getElementById('ipad-abort-btn').style.display='';
+  } else {
+    document.getElementById('ipad-tab-settings').style.display='';
+    document.getElementById('ipad-abort-btn').style.display='none';
+  }
+}
+
+function ipadUpdateTable(elapsed){
+  if(!navItemsCache.length)return;
+  const nextIdx=navItemsCache.findIndex(x=>elapsed<x.trig);
+  navItemsCache.forEach((item,i)=>{
+    const row=document.getElementById('itlm'+i);if(!row)return;
+    const fin=item.isFinish;
+    const passed=elapsed>=item.trig,isNext=!passed&&i===nextIdx;
+    row.className=passed?'lm-passed'+(fin?' lm-fin':''):isNext?'lm-next'+(fin?' lm-fin':''):'lm-upcoming'+(fin?' lm-fin':'');
+  });
+}
+
+function ipadUpdateProgress(elapsed){
+  const pct=Math.min(elapsed/idealSecs*100,100);
+  document.getElementById('progress-bar').style.height=pct+'%';
+}
+
+function ipadToggleSettings(){
+  // on iPad, settings are inline — this button saves/copies URL
+  saveUrl();
+}
+
+function ipadAbort(){
+  if(rafId){cancelAnimationFrame(rafId);rafId=null;}
+  phase='pre';
+  ipadInitRace();
+}
+
+// ── iPad: render landmark table ───────────────────────────────────────────────
+function renderIpadTable(){
+  const ideal=getIdeal(),track=getTrack();
+  const tbody=document.getElementById('ipad-lm-tbody');tbody.innerHTML='';
+  const items=landmarks.map(lm=>({
+    name:lm.name,meters:lm.meters,
+    trig:(lm.meters/track)*ideal,
+    rem:ideal-(lm.meters/track)*ideal,
+    cdStart:ideal-(lm.meters/track)*ideal+10,
+    isFinish:false
+  }));
+  items.push({name:'FINISH',meters:track,trig:ideal,rem:0,cdStart:10,isFinish:true});
+  items.sort((a,b)=>a.trig-b.trig);
+  // store for runtime updates
+  navItemsCache=items.map((x,i)=>({...x,idx:i}));
+  const editing=phase==='pre';
+  items.forEach((item,i)=>{
+    const tr=document.createElement('tr');
+    tr.id='itlm'+i;
+    tr.className='lm-upcoming'+(item.isFinish?' lm-fin':'');
+    if(editing&&!item.isFinish){
+      tr.innerHTML=`
+        <td class="td-name"><input class="td-edit" value="${item.name}" maxlength="8" onchange="editLm(${i},'name',this.value)" autocorrect="off" spellcheck="false"></td>
+        <td class="td-m"><input class="td-edit" value="${item.meters}" style="width:55px;text-align:right" onchange="editLm(${i},'meters',this.value)"></td>
+        <td class="td-rem">${fmt(item.rem)}</td>
+        <td class="td-cd">${fmt(item.cdStart)}</td>
+        <td class="td-del"><button onclick="delLandmark(${i})">✕</button></td>`;
+    } else {
+      tr.innerHTML=`
+        <td class="td-name">${item.name}</td>
+        <td class="td-m">${item.isFinish?'':item.meters+' m'}</td>
+        <td class="td-rem">${fmt(item.rem)}</td>
+        <td class="td-cd">${fmt(item.cdStart)}</td>
+        <td class="td-del">${item.isFinish?'':''}</td>`;
+    }
+    tbody.appendChild(tr);
+  });
+}
+
+function editLm(i,field,val){
+  if(field==='name') landmarks[i].name=val.toUpperCase().slice(0,8);
+  if(field==='meters'){
+    const m=parseInt(val)||0;
+    landmarks[i].meters=m;
+    const ideal=getIdeal(),track=getTrack();
+    landmarks[i].trig=(m/track)*ideal;
+  }
+  saveLocal(true);
+  renderIpadTable();
+}
+
+function addLandmarkIpad(){
+  const name=document.getElementById('ipad-lm-name').value.trim().toUpperCase().slice(0,8);
+  if(!name)return;
+  const m=parseInt(D.lmD0)*1000+parseInt(D.lmD1)*100+parseInt(D.lmD2)*10+parseInt(D.lmD3);
+  if(!m)return;
+  const ideal=getIdeal(),track=getTrack();
+  landmarks.push({name,meters:m,trig:(m/track)*ideal});
+  landmarks.sort((a,b)=>a.meters-b.meters);
+  document.getElementById('ipad-lm-name').value='';
+  ['lmD0','lmD1','lmD2','lmD3'].forEach(id=>setDval(id,0));
+  saveLocal(true);
+  renderIpadTable();
+  ipadDrawTicks();
+  renderLandmarks();
+}
+
+function syncCd(id,el){
+  document.getElementById(id).checked=el.checked;
 }
 
 // ── Beep scheduling ───────────────────────────────────────────────────────────
 function checkBeeps(elapsed){
   const ideal=idealSecs;
-  const isLast=curLap===nLapsRace-1;
-  const lapLbl=isLast?'FINISH':'LAP '+(curLap+1);
-
-  // Lap countdown
-  if(document.getElementById('lapCd').checked){
+  const lapLbl=(curLap===nLapsRace-1)?'FINISH':'LAP '+(curLap+1);
+  if(useLapCd){
     for(let i=10;i>=1;i--){
-      const t=ideal-i; if(t<0)continue;
+      const t=ideal-i;if(t<0)continue;
       const k='lc'+i;
       if(!firedBeeps.has(k)&&elapsed>=t){firedBeeps.add(k);beep(660,.07,.4);showCd(lapLbl,i);}
     }
   }
-  // Lap hit
   if(!firedBeeps.has('lh')&&elapsed>=ideal){
-    firedBeeps.add('lh');beep(880,.08,.8);setTimeout(()=>beep(1047,.15,.8),100);hideCd();
+    firedBeeps.add('lh');beepWithFlash(880,.08,.8);setTimeout(()=>beepWithFlash(1047,.15,.8),100);hideCd();doFinishFlash();
   }
-  // Landmarks
   lmsCalc.forEach(lm=>{
-    if(document.getElementById('lmCd').checked){
+    if(useLmCd){
       for(let i=10;i>=1;i--){
-        const t=lm.trig-i; if(t<0)continue;
+        const t=lm.trig-i;if(t<0)continue;
         const k=lm.name+'c'+i;
         if(!firedBeeps.has(k)&&elapsed>=t){firedBeeps.add(k);beep(660,.07,.4);showCd(lm.name,i);}
       }
     }
     const k=lm.name+'h';
-    if(!firedBeeps.has(k)&&elapsed>=lm.trig){firedBeeps.add(k);beep(1047,.1,.7);hideCd();}
+    if(!firedBeeps.has(k)&&elapsed>=lm.trig){firedBeeps.add(k);beepWithFlash(1047,.1,.7);hideCd();}
   });
 }
 
 // ── Main loop ─────────────────────────────────────────────────────────────────
 function startLoop(){
-  function tick(){
+  (function tick(){
     if(phase!=='running')return;
     const elapsed=(performance.now()-startTime)/1000;
     const rem=idealSecs-elapsed;
-    updateLapRows(rem);
-    updateNavScreen(elapsed,rem);
+    if(isIpad()){
+      ipadUpdateLapRows(rem);
+      ipadUpdateTable(elapsed);
+      ipadUpdateProgress(elapsed);
+    } else {
+      updateLapRows(rem);
+      updateNavScreen(elapsed,rem);
+    }
     checkBeeps(elapsed);
     rafId=requestAnimationFrame(tick);
-  }
-  rafId=requestAnimationFrame(tick);
+  })();
 }
 
 // ── Handle action ─────────────────────────────────────────────────────────────
 function handleAction(){
-  getACtx(); // unlock audio
+  getACtx();
   const now=performance.now();
-
   if(phase==='pre'){
     idealSecs=getIdeal();
     const track=getTrack();
     nLapsRace=D.nLaps;
+    useLapCd=document.getElementById('lapCd').checked;
+    useLmCd=document.getElementById('lmCd').checked;
     lmsCalc=landmarks.map(lm=>({...lm,trig:(lm.meters/track)*idealSecs}));
+    buildNavItems();
     firedBeeps=new Set();
     curLap=0;lapResults=[];
     phase='running';startTime=now;
-    document.getElementById('race-title').textContent='Running';
-    updateBtn();
+    if(isIpad()){
+      ipadLockSettings(true);
+      renderIpadTable();
+      ipadDrawTicks();
+      document.getElementById('ipad-race-title').textContent='Running';
+      ipadUpdateBtn();
+    } else {
+      document.getElementById('race-title').textContent='Running';
+      updateBtn();
+    }
+    document.getElementById('progress-bar').style.height='0%';
     startLoop();
-
   } else if(phase==='running'){
     const elapsed=(now-startTime)/1000;
     const rem=idealSecs-elapsed;
     lapResults.push(rem);
-
     if(curLap===nLapsRace-1){
-      // Finished
       phase='finished';
       cancelAnimationFrame(rafId);rafId=null;
-      updateLapRows(rem);
-      showResults();
+      if(isIpad()){
+        ipadUpdateLapRows(rem);
+        ipadShowResults();
+        ipadLockSettings(false);
+        renderIpadTable();
+        ipadUpdateBtn();
+      } else {
+        updateLapRows(rem);
+        showResults();
+      }
     } else {
-      curLap++;
-      startTime=now;
-      firedBeeps=new Set();
-      buildNavScreen();
-      updateBtn();
+      curLap++;startTime=now;firedBeeps=new Set();
+      buildNavItems();
+      document.getElementById('progress-bar').style.height='0%';
+      if(isIpad()){renderIpadTable();ipadUpdateBtn();}
+      else{buildNavScreen();updateBtn();}
     }
   }
 }
 
 // ── Results ───────────────────────────────────────────────────────────────────
 function showResults(){
-  const c=document.getElementById('res-rows');
-  c.innerHTML='';
+  const c=document.getElementById('res-rows');c.innerHTML='';
   let penalty=0;
   lapResults.forEach((r,i)=>{
     penalty+=Math.abs(r);
-    const row=document.createElement('div');
-    row.className='res-row';
-    row.innerHTML=`<div class="res-lbl">LAP ${i+1}</div><div class="res-t ${tcls(r)}">${fmt(r)}</div>`;
+    const row=document.createElement('div');row.className='res-row';
+    row.innerHTML=`<div class="res-lbl">LAP ${i+1}</div><div class="res-t">${fmt(r)}</div>`;
     c.appendChild(row);
   });
-  document.getElementById('penalty-val').textContent=penalty.toFixed(2)+'s';
+  document.getElementById('penalty-val').textContent=(Math.round(penalty*100)/100).toFixed(2)+'s';
   goto('result');
 }
 
-// ── Landmarks ─────────────────────────────────────────────────────────────────
+function ipadShowResults(){
+  const c=document.getElementById('ipad-result-summary');c.innerHTML='';
+  let penalty=0;
+  lapResults.forEach((r,i)=>{
+    penalty+=Math.abs(r);
+    const row=document.createElement('div');row.className='ipad-res-row';
+    row.innerHTML=`<div class="ipad-res-lbl">LAP ${i+1}</div><div class="ipad-res-t">${fmt(r)}</div>`;
+    c.appendChild(row);
+  });
+  const pr=document.createElement('div');pr.className='ipad-penalty-row';
+  pr.innerHTML=`<span class="ipad-penalty-lbl">Penalty</span><span class="ipad-penalty-val">${(Math.round(penalty*100)/100).toFixed(2)}s</span>`;
+  c.appendChild(pr);
+  c.classList.add('on');
+}
+
+// ── Landmarks (phone) ─────────────────────────────────────────────────────────
 function addLandmark(){
   const name=document.getElementById('lm-name').value.trim().toUpperCase().slice(0,8);
   if(!name)return;
-  const m=getLmMeters();
-  if(!m)return;
+  const m=getLmMeters();if(!m)return;
   const ideal=getIdeal(),track=getTrack();
   landmarks.push({name,meters:m,trig:(m/track)*ideal});
   landmarks.sort((a,b)=>a.meters-b.meters);
@@ -645,130 +1159,84 @@ function addLandmark(){
   ['lmD0','lmD1','lmD2','lmD3'].forEach(id=>setDval(id,0));
   saveLocal(true);
   renderLandmarks();
+  if(isIpad())renderIpadTable();
 }
-
 function renderLandmarks(){
-  const ideal=getIdeal(),track=getTrack();
-  const c=document.getElementById('lm-list');
+  const ideal=getIdeal(),track=getTrack(),c=document.getElementById('lm-list');
   c.innerHTML='';
-  if(!landmarks.length){
-    c.innerHTML='<div class="lm-empty">No landmarks added yet</div>';
-    return;
-  }
+  if(!landmarks.length){c.innerHTML='<div class="lm-empty">No landmarks added yet</div>';return;}
   landmarks.forEach((lm,i)=>{
     const rem=ideal-(lm.meters/track)*ideal;
-    const row=document.createElement('div');
-    row.className='lm-item';
-    row.innerHTML=`
-      <div class="lm-name">${lm.name}</div>
-      <div class="lm-meta"><span>${lm.meters} m</span><span class="lm-disp">${fmt(rem)}</span></div>
-      <button class="lm-del" onclick="delLandmark(${i})">✕</button>`;
+    const row=document.createElement('div');row.className='lm-item';
+    row.innerHTML=`<div class="lm-name">${lm.name}</div><div class="lm-meta"><span>${lm.meters} m</span><span class="lm-disp">${fmt(rem)}</span></div><button class="lm-del" onclick="delLandmark(${i})">✕</button>`;
     c.appendChild(row);
   });
 }
-
 function delLandmark(i){
-  landmarks.splice(i,1);
-  saveLocal(true);
-  renderLandmarks();
+  landmarks.splice(i,1);saveLocal(true);
+  renderLandmarks();if(isIpad()){renderIpadTable();ipadDrawTicks();}
 }
 
-// ── Persistence: localStorage ─────────────────────────────────────────────────
+// ── Persistence ───────────────────────────────────────────────────────────────
 function saveLocal(silent=false){
   try{
-    const data={
+    localStorage.setItem('rrt',JSON.stringify({
       ltM0:D.ltM0,ltM1:D.ltM1,ltS0:D.ltS0,ltS1:D.ltS1,ltH0:D.ltH0,ltH1:D.ltH1,
       nLaps:D.nLaps,trk0:D.trk0,trk1:D.trk1,trk2:D.trk2,trk3:D.trk3,
       lapCd:document.getElementById('lapCd').checked,
       lmCd:document.getElementById('lmCd').checked,
       landmarks
-    };
-    localStorage.setItem('rrt',JSON.stringify(data));
-    if(!silent){
-      const btn=event&&event.target;
-      if(btn){const orig=btn.textContent;btn.textContent='✓ Saved';setTimeout(()=>btn.textContent=orig,1500);}
-    }
+    }));
+    if(!silent&&event&&event.target){const b=event.target,orig=b.textContent;b.textContent='Saved';setTimeout(()=>b.textContent=orig,1500);}
   }catch(e){}
 }
-
 function loadLocal(){
   try{
-    const raw=localStorage.getItem('rrt');
-    if(!raw)return false;
-    const d=JSON.parse(raw);
-    const keys=['ltM0','ltM1','ltS0','ltS1','ltH0','ltH1','nLaps','trk0','trk1','trk2','trk3'];
-    keys.forEach(k=>{if(d[k]!==undefined)setDval(k,d[k]);});
-    if(d.lapCd!==undefined)document.getElementById('lapCd').checked=d.lapCd;
-    if(d.lmCd!==undefined)document.getElementById('lmCd').checked=d.lmCd;
+    const d=JSON.parse(localStorage.getItem('rrt'));if(!d)return false;
+    ['ltM0','ltM1','ltS0','ltS1','ltH0','ltH1','nLaps','trk0','trk1','trk2','trk3'].forEach(k=>{if(d[k]!==undefined)setDval(k,d[k]);});
+    if(d.lapCd!==undefined){document.getElementById('lapCd').checked=d.lapCd;const i=document.getElementById('i-lapCd');if(i)i.checked=d.lapCd;}
+    if(d.lmCd!==undefined){document.getElementById('lmCd').checked=d.lmCd;const i=document.getElementById('i-lmCd');if(i)i.checked=d.lmCd;}
     if(d.landmarks)landmarks=d.landmarks;
     return true;
   }catch(e){return false;}
 }
-
-// ── Persistence: URL ──────────────────────────────────────────────────────────
 function saveUrl(){
   const p=new URLSearchParams();
-  p.set('t',getIdeal().toFixed(2));
-  p.set('l',D.nLaps);
-  p.set('d',getTrack());
+  p.set('t',getIdeal().toFixed(2));p.set('l',D.nLaps);p.set('d',getTrack());
   p.set('lc',document.getElementById('lapCd').checked?1:0);
   p.set('mc',document.getElementById('lmCd').checked?1:0);
-  if(landmarks.length){
-    p.set('lms',encodeURIComponent(JSON.stringify(landmarks.map(lm=>({n:lm.name,m:lm.meters})))));
-  }
+  if(landmarks.length)p.set('lm',landmarks.map(lm=>lm.name+':'+lm.meters).join(','));
   const url=location.origin+location.pathname+'?'+p.toString();
   const disp=document.getElementById('share-url-display');
-  disp.textContent=url;
-  disp.style.display='block';
+  if(disp){disp.textContent=url;disp.style.display='block';}
   try{navigator.clipboard.writeText(url);}catch(e){}
   try{history.replaceState(null,'',url);}catch(e){}
 }
-
 function loadUrl(){
-  const p=new URLSearchParams(location.search);
-  if(!p.has('t'))return false;
-
-  const t=parseFloat(p.get('t'));
-  if(isNaN(t))return false;
-
-  const mins=Math.floor(t/60);
-  const secs=Math.floor(t%60);
-  const huns=Math.round((t%1)*100);
-  setDval('ltM0',Math.floor(mins/10));
-  setDval('ltM1',mins%10);
-  setDval('ltS0',Math.floor(secs/10));
-  setDval('ltS1',secs%10);
-  setDval('ltH0',Math.floor(huns/10));
-  setDval('ltH1',huns%10);
-
+  const p=new URLSearchParams(location.search);if(!p.has('t'))return false;
+  const t=parseFloat(p.get('t'));if(isNaN(t))return false;
+  const mins=Math.floor(t/60),secs=Math.floor(t%60),huns=Math.round((t%1)*100);
+  setDval('ltM0',Math.floor(mins/10));setDval('ltM1',mins%10);
+  setDval('ltS0',Math.floor(secs/10));setDval('ltS1',secs%10);
+  setDval('ltH0',Math.floor(huns/10));setDval('ltH1',huns%10);
   if(p.has('l'))setDval('nLaps',parseInt(p.get('l'))||3);
-
-  if(p.has('d')){
-    const d=parseInt(p.get('d'))||2094;
-    setDval('trk0',Math.floor(d/1000));
-    setDval('trk1',Math.floor((d%1000)/100));
-    setDval('trk2',Math.floor((d%100)/10));
-    setDval('trk3',d%10);
-  }
-
-  if(p.has('lc'))document.getElementById('lapCd').checked=p.get('lc')==='1';
-  if(p.has('mc'))document.getElementById('lmCd').checked=p.get('mc')==='1';
-
-  if(p.has('lms')){
+  if(p.has('d')){const d=parseInt(p.get('d'))||2094;setDval('trk0',Math.floor(d/1000));setDval('trk1',Math.floor((d%1000)/100));setDval('trk2',Math.floor((d%100)/10));setDval('trk3',d%10);}
+  if(p.has('lc')){const v=p.get('lc')==='1';document.getElementById('lapCd').checked=v;const i=document.getElementById('i-lapCd');if(i)i.checked=v;}
+  if(p.has('mc')){const v=p.get('mc')==='1';document.getElementById('lmCd').checked=v;const i=document.getElementById('i-lmCd');if(i)i.checked=v;}
+  if(p.has('lm')){
     try{
-      const lms=JSON.parse(decodeURIComponent(p.get('lms')));
       const ideal=getIdeal(),track=getTrack();
-      landmarks=lms.map(x=>({name:x.n,meters:x.m,trig:(x.m/track)*ideal}));
+      landmarks=p.get('lm').split(',').map(s=>{const[name,m]=s.split(':'),meters=parseInt(m)||0;return{name:name.toUpperCase(),meters,trig:(meters/track)*ideal};}).filter(lm=>lm.name&&lm.meters>0);
     }catch(e){}
   }
   return true;
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-(function init(){
-  // URL params take priority, then localStorage
-  if(!loadUrl()) loadLocal();
+(function(){
+  if(!loadUrl())loadLocal();
   renderLandmarks();
+  if(isIpad()){renderIpadTable();ipadInitRace();}
 })();
 </script>
 </body>
