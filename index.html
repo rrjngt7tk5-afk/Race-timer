@@ -963,16 +963,16 @@ function ipadAbort(){
 function renderIpadTable(){
   const ideal=getIdeal(),track=getTrack();
   const tbody=document.getElementById('ipad-lm-tbody');tbody.innerHTML='';
-  const items=landmarks.map(lm=>({
+  const items=landmarks.map((lm,origIdx)=>({
     name:lm.name,meters:lm.meters,
     trig:(lm.meters/track)*ideal,
     rem:ideal-(lm.meters/track)*ideal,
     cdStart:ideal-(lm.meters/track)*ideal+10,
-    isFinish:false
+    isFinish:false,
+    origIdx
   }));
-  items.push({name:'FINISH',meters:track,trig:ideal,rem:0,cdStart:10,isFinish:true});
+  items.push({name:'FINISH',meters:track,trig:ideal,rem:0,cdStart:10,isFinish:true,origIdx:-1});
   items.sort((a,b)=>a.trig-b.trig);
-  // store for runtime updates
   navItemsCache=items.map((x,i)=>({...x,idx:i}));
   const editing=phase==='pre';
   items.forEach((item,i)=>{
@@ -981,33 +981,46 @@ function renderIpadTable(){
     tr.className='lm-upcoming'+(item.isFinish?' lm-fin':'');
     if(editing&&!item.isFinish){
       tr.innerHTML=`
-        <td class="td-name"><input class="td-edit" value="${item.name}" maxlength="8" onchange="editLm(${i},'name',this.value)" autocorrect="off" spellcheck="false"></td>
-        <td class="td-m"><input class="td-edit" value="${item.meters}" style="width:55px;text-align:right" onchange="editLm(${i},'meters',this.value)"></td>
-        <td class="td-rem">${fmt(item.rem)}</td>
-        <td class="td-cd">${fmt(item.cdStart)}</td>
-        <td class="td-del"><button onclick="delLandmark(${i})">✕</button></td>`;
+        <td class="td-name"><input class="td-edit" value="${item.name}" maxlength="8" oninput="editLm(${item.origIdx},'name',this.value)" autocorrect="off" spellcheck="false"></td>
+        <td class="td-m"><input class="td-edit" value="${item.meters}" style="width:55px;text-align:right" oninput="editLm(${item.origIdx},'meters',this.value)"></td>
+        <td class="td-rem" id="itlm-rem${i}">${fmt(item.rem)}</td>
+        <td class="td-cd" id="itlm-cd${i}">${fmt(item.cdStart)}</td>
+        <td class="td-del"><button onclick="delLandmark(${item.origIdx})">✕</button></td>`;
     } else {
       tr.innerHTML=`
         <td class="td-name">${item.name}</td>
         <td class="td-m">${item.isFinish?'':item.meters+' m'}</td>
         <td class="td-rem">${fmt(item.rem)}</td>
         <td class="td-cd">${fmt(item.cdStart)}</td>
-        <td class="td-del">${item.isFinish?'':''}</td>`;
+        <td class="td-del"></td>`;
     }
     tbody.appendChild(tr);
   });
 }
 
 function editLm(i,field,val){
-  if(field==='name') landmarks[i].name=val.toUpperCase().slice(0,8);
+  if(field==='name'){
+    landmarks[i].name=val.toUpperCase().slice(0,8);
+  }
   if(field==='meters'){
     const m=parseInt(val)||0;
     landmarks[i].meters=m;
     const ideal=getIdeal(),track=getTrack();
     landmarks[i].trig=(m/track)*ideal;
+    // update displayed time cells without rebuilding table
+    const rem=ideal-(m/track)*ideal;
+    const cdStart=rem+10;
+    // find which row this landmark is in (by origIdx)
+    navItemsCache.forEach((item,rowIdx)=>{
+      if(item.origIdx===i){
+        const remEl=document.getElementById('itlm-rem'+rowIdx);
+        const cdEl=document.getElementById('itlm-cd'+rowIdx);
+        if(remEl)remEl.textContent=fmt(rem);
+        if(cdEl)cdEl.textContent=fmt(cdStart);
+      }
+    });
   }
   saveLocal(true);
-  renderIpadTable();
 }
 
 function addLandmarkIpad(){
