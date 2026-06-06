@@ -638,7 +638,7 @@ input.name-in::placeholder{color:var(--muted);text-transform:none;letter-spacing
       </div>
 
       <div class="action-area">
-        <button class="abtn start" id="ipad-abtn" onclick="handleAction()">START</button>
+        <button class="abtn start" id="ipad-abtn" onclick="phase==='finished'?gotoRace():handleAction()">START</button>
         <div class="hint" id="ipad-ahint"></div>
       </div>
     </div>
@@ -676,8 +676,20 @@ function beepWithFlash(freq,dur,vol){
 }
 function doFinishFlash(){
   const f=document.getElementById('flash');
-  f.classList.add('on','white');setTimeout(()=>{f.classList.remove('on','white');},120);
-  setTimeout(()=>{f.classList.add('on','white');setTimeout(()=>f.classList.remove('on','white'),120);},200);
+  f.classList.add('on','white');
+  setTimeout(()=>{f.classList.remove('on','white');},120);
+  setTimeout(()=>{
+    f.classList.add('on','white');
+    setTimeout(()=>f.classList.remove('on','white'),120);
+  },200);
+}
+
+function clearOverlays(){
+  const f=document.getElementById('flash');
+  f.classList.remove('on','white');
+  document.getElementById('cdbox').classList.remove('on');
+  if(cdHide)clearTimeout(cdHide);
+  if(cdRafId)cancelAnimationFrame(cdRafId);
 }
 
 // ── Countdown overlay ─────────────────────────────────────────────────────────
@@ -906,8 +918,8 @@ function ipadUpdateLapRows(rem){
 
 function ipadUpdateBtn(){
   const isLast=curLap===D.nLaps-1;
-  const type=phase==='pre'?'start':isLast?'finish':'lap';
-  const lbl=phase==='pre'?'START':isLast?'FINISH':'LAP';
+  const type=phase==='pre'?'start':phase==='finished'?'reset':isLast?'finish':'lap';
+  const lbl=phase==='pre'?'START':phase==='finished'?'RESET':isLast?'FINISH':'LAP';
   const hint=phase==='running'?`Lap ${curLap+1} of ${D.nLaps}`:'';
   const b=document.getElementById('ipad-abtn');if(b){b.className='abtn '+type;b.textContent=lbl;}
   const h=document.getElementById('ipad-ahint');if(h)h.textContent=hint;
@@ -1099,6 +1111,7 @@ function handleAction(){
       phase='finished';
       cancelAnimationFrame(rafId);rafId=null;
       if(isIpad()){
+        clearOverlays();
         ipadUpdateLapRows(rem);
         ipadShowResults();
         ipadLockSettings(false);
